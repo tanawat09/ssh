@@ -1,17 +1,14 @@
-import { FormatRegistry } from '@sinclair/typebox'
 import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { describe, expect, it } from 'vitest'
 
-import { ApiErrorSchema } from './api-error.js'
-import { LoginRequestSchema, SessionDtoSchema } from './auth-contract.js'
 import {
+  ApiErrorCode,
+  ApiErrorSchema,
   CreateServerRequestSchema,
+  LoginRequestSchema,
   ServerDtoSchema,
-} from './server-contract.js'
-
-FormatRegistry.Set('date-time', (value) => {
-  return /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value))
-})
+  SessionDtoSchema,
+} from './index.js'
 
 describe('CreateServerRequestSchema', () => {
   const check = TypeCompiler.Compile(CreateServerRequestSchema)
@@ -69,28 +66,46 @@ describe('CreateServerRequestSchema', () => {
     ).toBe(false)
   })
 
-  it('enforces the approved string bounds', () => {
+  it('enforces every approved maximum string boundary', () => {
+    const passwordRequest = {
+      name: 'n'.repeat(100),
+      host: 'h'.repeat(253),
+      port: 22,
+      username: 'u'.repeat(64),
+      authType: 'password',
+      password: 'p'.repeat(1_024),
+    }
+    const privateKeyRequest = {
+      name: 'Production',
+      host: 'server.example.com',
+      port: 22,
+      username: 'deploy',
+      authType: 'privateKey',
+      privateKey: 'k'.repeat(65_536),
+      passphrase: 'p'.repeat(1_024),
+    }
+
+    expect(check.Check(passwordRequest)).toBe(true)
+    expect(check.Check({ ...passwordRequest, name: 'n'.repeat(101) })).toBe(
+      false,
+    )
+    expect(check.Check({ ...passwordRequest, host: 'h'.repeat(254) })).toBe(
+      false,
+    )
+    expect(check.Check({ ...passwordRequest, username: 'u'.repeat(65) })).toBe(
+      false,
+    )
     expect(
-      check.Check({
-        name: 'n'.repeat(101),
-        host: 'server.example.com',
-        port: 22,
-        username: 'deploy',
-        authType: 'password',
-        password: 'secret',
-      }),
+      check.Check({ ...passwordRequest, password: 'p'.repeat(1_025) }),
+    ).toBe(false)
+    expect(check.Check(privateKeyRequest)).toBe(true)
+    expect(
+      check.Check({ ...privateKeyRequest, privateKey: 'k'.repeat(65_537) }),
     ).toBe(false)
     expect(
-      check.Check({
-        name: 'Production',
-        host: 'server.example.com',
-        port: 22,
-        username: 'deploy',
-        authType: 'privateKey',
-        privateKey: 'pem',
-        passphrase: '',
-      }),
-    ).toBe(true)
+      check.Check({ ...privateKeyRequest, passphrase: 'p'.repeat(1_025) }),
+    ).toBe(false)
+    expect(check.Check({ ...privateKeyRequest, passphrase: '' })).toBe(true)
   })
 })
 
@@ -153,6 +168,28 @@ describe('public response schemas', () => {
           message: 'The request is invalid',
           submittedValues: { password: 'secret' },
         },
+      }),
+    ).toBe(false)
+  })
+
+  it('exposes exactly the approved API error codes and rejects unknown codes', () => {
+    const errorCheck = TypeCompiler.Compile(ApiErrorSchema)
+
+    expect(Object.values(ApiErrorCode).sort()).toEqual(
+      [
+        'INVALID_REQUEST',
+        'UNAUTHENTICATED',
+        'FORBIDDEN',
+        'SERVER_ALREADY_EXISTS',
+        'SSH_AUTHENTICATION_FAILED',
+        'SSH_CONNECTION_FAILED',
+        'SSH_TIMEOUT',
+        'INTERNAL_ERROR',
+      ].sort(),
+    )
+    expect(
+      errorCheck.Check({
+        error: { code: 'UNKNOWN_ERROR', message: 'Unknown error' },
       }),
     ).toBe(false)
   })

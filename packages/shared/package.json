@@ -4,9 +4,9 @@
   "description": "Runtime-safe public contracts for the Web Remote Platform",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "build": "node node_modules/typescript/bin/tsc -p tsconfig.json",
     "test": "node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts",
-    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
   },
   "keywords": [],
   "author": "",
