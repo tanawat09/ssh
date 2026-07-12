@@ -61,6 +61,13 @@ function decodeCredentialEncryptionKey(encodedKey: string): Buffer {
   return key
 }
 
+function validateJwtSecret(secret: string): string {
+  if (Buffer.byteLength(secret, 'utf8') < 32) {
+    throw new Error('JWT_SECRET must be at least 32 UTF-8 bytes')
+  }
+  return secret
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   const values = Object.fromEntries(
     requiredVariables.map((name) => [name, requireVariable(env, name)]),
@@ -70,7 +77,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     nodeEnv: env.NODE_ENV ?? 'development',
     adminUsername: values.ADMIN_USERNAME,
     adminPasswordHash: values.ADMIN_PASSWORD_HASH,
-    jwtSecret: values.JWT_SECRET,
+    jwtSecret: validateJwtSecret(values.JWT_SECRET),
     jwtExpiresInSeconds: parseBoundedInteger(
       env,
       'JWT_EXPIRES_IN_SECONDS',

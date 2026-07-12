@@ -5,7 +5,7 @@ import { loadConfig } from './config.js'
 const validEnv = {
   ADMIN_USERNAME: 'admin',
   ADMIN_PASSWORD_HASH: '$argon2id$v=19$test',
-  JWT_SECRET: 'test-jwt-secret',
+  JWT_SECRET: 'a-secure-test-jwt-secret-with-32-bytes',
   CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   ALLOWED_ORIGIN: 'https://remote.example.test',
   DATABASE_PATH: '/data/remote.sqlite',
@@ -36,6 +36,23 @@ describe('loadConfig', () => {
         CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(31).toString('base64'),
       }),
     ).toThrow('CREDENTIAL_ENCRYPTION_KEY must be Base64-encoded 32 bytes')
+  })
+
+  it.each(['a'.repeat(31), 'ก'.repeat(10)])(
+    'rejects a JWT secret shorter than 32 UTF-8 bytes',
+    (jwtSecret) => {
+      expect(() => loadConfig({ ...validEnv, JWT_SECRET: jwtSecret })).toThrow(
+        'JWT_SECRET must be at least 32 UTF-8 bytes',
+      )
+    },
+  )
+
+  it('accepts a JWT secret that is exactly 32 UTF-8 bytes', () => {
+    const jwtSecret = `${'ก'.repeat(10)}ab`
+
+    expect(loadConfig({ ...validEnv, JWT_SECRET: jwtSecret }).jwtSecret).toBe(
+      jwtSecret,
+    )
   })
 
   it.each(['999', '60001', '1000.5', 'not-a-number'])(
