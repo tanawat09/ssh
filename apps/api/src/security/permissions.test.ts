@@ -50,6 +50,22 @@ describe('requirePermission', () => {
     })
   })
 
+  it.each([
+    'not-a-jwt',
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiJ9.invalid-signature',
+  ])('rejects malformed or invalidly signed JWTs', async (token) => {
+    const response = await createApp().inject({
+      method: 'GET',
+      url: '/protected',
+      headers: { cookie: `remote_session=${token}` },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({
+      error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+    })
+  })
+
   it('allows an admin JWT to use servers:create', async () => {
     const app = createApp()
     await app.ready()

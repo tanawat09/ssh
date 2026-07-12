@@ -196,9 +196,71 @@ describe('POST /api/v1/auth/login', () => {
         expect((await app.inject(request)).statusCode).toBe(401)
       }
 
-      now.mockReturnValue(15 * 60 * 1000 + 1)
+      now.mockReturnValue(15 * 60 * 1000)
       expect((await app.inject(request)).statusCode).toBe(401)
       expect((await app.inject(request)).statusCode).toBe(429)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it('fails closed for unseen IPs without evicting a live IP at capacity', async () => {
+    const app = createApp()
+
+    for (let index = 0; index < 5_000; index += 1) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        headers: loginHeaders(),
+        remoteAddress: `198.51.${String(Math.floor(index / 256))}.${String(index % 256)}`,
+        payload: {},
+      })
+      expect(response.statusCode).toBe(400)
+    }
+
+    const overflowRequest = {
+      method: 'POST' as const,
+      url: '/api/v1/auth/login',
+      headers: loginHeaders(),
+      remoteAddress: '203.0.113.1',
+      payload: {},
+    }
+    expect((await app.inject(overflowRequest)).statusCode).toBe(429)
+
+    const firstIpRequest = {
+      ...overflowRequest,
+      remoteAddress: '198.51.0.0',
+    }
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      expect((await app.inject(firstIpRequest)).statusCode).toBe(400)
+    }
+    expect((await app.inject(firstIpRequest)).statusCode).toBe(429)
+  })
+
+  it('does not retain attempts rejected by the per-IP limit', async () => {
+    const app = createApp()
+    const request = {
+      method: 'POST' as const,
+      url: '/api/v1/auth/login',
+      headers: loginHeaders(),
+      remoteAddress: '192.0.2.12',
+      payload: { username: 'admin', password: 'wrong-password' },
+    }
+    const now = vi.spyOn(Date, 'now')
+
+    try {
+      now.mockReturnValue(0)
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        expect((await app.inject(request)).statusCode).toBe(401)
+      }
+
+      now.mockReturnValue(1)
+      expect((await app.inject(request)).statusCode).toBe(429)
+
+      now.mockReturnValue(15 * 60 * 1000)
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        expect((await app.inject(request)).statusCode).toBe(401)
+      }
     } finally {
       now.mockRestore()
     }

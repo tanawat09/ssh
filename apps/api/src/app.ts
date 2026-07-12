@@ -29,32 +29,48 @@ class RollingWindowStore {
       result?: { current: number; ttl: number },
     ) => void,
     timeWindow: number,
+    max: number,
   ): void {
     const now = Date.now()
-    const attempts = (this.attemptsByKey.get(key) ?? []).filter(
-      (attemptedAt) => attemptedAt > now - timeWindow,
-    )
+    this.pruneExpired(now, timeWindow)
+    const attempts = this.attemptsByKey.get(key)
 
-    if (
-      !this.attemptsByKey.has(key) &&
-      this.attemptsByKey.size >= maxRateLimitKeys
-    ) {
-      const oldestKey = this.attemptsByKey.keys().next().value
-      if (oldestKey !== undefined) {
-        this.attemptsByKey.delete(oldestKey)
-      }
+    if (attempts === undefined && this.attemptsByKey.size >= maxRateLimitKeys) {
+      callback(null, { current: max + 1, ttl: timeWindow })
+      return
     }
 
-    attempts.push(now)
-    this.attemptsByKey.set(key, attempts)
+    if (attempts !== undefined && attempts.length >= max) {
+      callback(null, {
+        current: max + 1,
+        ttl: (attempts[0] ?? now) + timeWindow - now,
+      })
+      return
+    }
+
+    const updatedAttempts = [...(attempts ?? []), now]
+    this.attemptsByKey.set(key, updatedAttempts)
     callback(null, {
-      current: attempts.length,
-      ttl: (attempts[0] ?? now) + timeWindow - now,
+      current: updatedAttempts.length,
+      ttl: (updatedAttempts[0] ?? now) + timeWindow - now,
     })
   }
 
   child(): RollingWindowStore {
     return new RollingWindowStore()
+  }
+
+  private pruneExpired(now: number, timeWindow: number): void {
+    for (const [key, attempts] of this.attemptsByKey) {
+      const liveAttempts = attempts.filter(
+        (attemptedAt) => attemptedAt > now - timeWindow,
+      )
+      if (liveAttempts.length === 0) {
+        this.attemptsByKey.delete(key)
+      } else if (liveAttempts.length !== attempts.length) {
+        this.attemptsByKey.set(key, liveAttempts)
+      }
+    }
   }
 }
 
