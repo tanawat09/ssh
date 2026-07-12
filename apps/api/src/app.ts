@@ -11,9 +11,14 @@ import Fastify, {
 import { registerAuthRoute } from './auth/auth-route.js'
 import type { AppConfig } from './config.js'
 import { ApplicationError } from './domain/application-error.js'
+import {
+  registerServerRoute,
+  type CreateServerExecutor,
+} from './servers/server-route.js'
 
 export interface BuildAppOptions {
   config: AppConfig
+  createServerService?: CreateServerExecutor
 }
 
 const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -107,8 +112,23 @@ function sendError(error: unknown, reply: FastifyReply) {
   })
 }
 
-export function buildApp({ config }: BuildAppOptions): FastifyInstance {
-  const app = Fastify()
+export function buildApp({
+  config,
+  createServerService,
+}: BuildAppOptions): FastifyInstance {
+  const app = Fastify({
+    logger:
+      config.nodeEnv === 'production'
+        ? {
+            redact: [
+              'req.headers.cookie',
+              'req.body.password',
+              'req.body.privateKey',
+              'req.body.passphrase',
+            ],
+          }
+        : false,
+  })
 
   app.register(cookie)
   app.register(jwt, {
@@ -145,6 +165,9 @@ export function buildApp({ config }: BuildAppOptions): FastifyInstance {
   app.setErrorHandler((error, _request, reply) => sendError(error, reply))
   app.register((instance, _options, done) => {
     registerAuthRoute(instance, { config })
+    if (createServerService !== undefined) {
+      registerServerRoute(instance, createServerService)
+    }
     done()
   })
 
