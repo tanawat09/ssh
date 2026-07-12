@@ -1,0 +1,29 @@
+{
+  "name": "@remote/shared",
+  "version": "1.0.0",
+  "description": "Runtime-safe public contracts for the Web Remote Platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "test": "node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.52"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
