@@ -1,0 +1,26 @@
+{
+  "name": "@remote/api",
+  "version": "1.0.0",
+  "description": "Fastify API for the Web Remote Platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node node_modules/typescript/bin/tsc -p tsconfig.json && mkdir -p dist/database/migrations && cp src/database/migrations/*.sql dist/database/migrations/",
+    "test": "node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "module",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@remote/shared": "^1.0.0",
+    "better-sqlite3": "^12.11.1",
+    "fastify": "^5.10.0"
+  }
+}
