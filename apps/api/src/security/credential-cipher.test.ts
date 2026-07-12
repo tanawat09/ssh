@@ -106,6 +106,59 @@ describe('CredentialCipher', () => {
     ).toThrow()
   })
 
+  it.each([
+    ['encryptedPayload', 'Encrypted payload'],
+    ['iv', 'IV'],
+    ['authTag', 'Authentication tag'],
+  ] as const)('rejects invalid Base64 in %s', (field, fieldLabel) => {
+    const cipher = new CredentialCipher(encryptionKey)
+    const encrypted = cipher.encrypt({
+      authType: 'password',
+      password: 'secret',
+    })
+
+    expect(() => cipher.decrypt({ ...encrypted, [field]: '*' })).toThrow(
+      `${fieldLabel} must be valid Base64`,
+    )
+  })
+
+  it.each([
+    ['encryptedPayload', 'Encrypted payload'],
+    ['iv', 'IV'],
+    ['authTag', 'Authentication tag'],
+  ] as const)('rejects noncanonical Base64 in %s', (field, fieldLabel) => {
+    const cipher = new CredentialCipher(encryptionKey)
+    const encrypted = cipher.encrypt({
+      authType: 'password',
+      password: 'secret',
+    })
+
+    expect(() =>
+      cipher.decrypt({ ...encrypted, [field]: `${encrypted[field]}=` }),
+    ).toThrow(`${fieldLabel} must be valid Base64`)
+  })
+
+  it.each([
+    ['iv', 11, 'IV must be exactly 12 bytes'],
+    ['authTag', 15, 'Authentication tag must be exactly 16 bytes'],
+  ] as const)(
+    'rejects an incorrect decoded %s length',
+    (field, length, expectedMessage) => {
+      const cipher = new CredentialCipher(encryptionKey)
+      const encrypted = cipher.encrypt({
+        authType: 'password',
+        password: 'secret',
+      })
+
+      expect(() =>
+        cipher.decrypt({
+          ...encrypted,
+          [field]: Buffer.alloc(length).toString('base64'),
+        }),
+      ).toThrow(expectedMessage)
+    },
+  )
+
   it('rejects encryption keys that are not exactly 32 bytes', () => {
     expect(() => new CredentialCipher(Buffer.alloc(31))).toThrow(
       'Credential encryption key must be exactly 32 bytes',
