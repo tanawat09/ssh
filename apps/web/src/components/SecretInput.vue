@@ -8,6 +8,7 @@ const props = defineProps<{
   modelValue: string
   autocomplete?: string | undefined
   error?: string | undefined
+  required?: boolean | undefined
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const visible = ref(false)
@@ -25,6 +26,7 @@ const actionLabel = computed(
         :value="modelValue"
         :type="visible ? 'text' : 'password'"
         :autocomplete="autocomplete ?? 'off'"
+        :required="required"
         :aria-invalid="error ? 'true' : undefined"
         :aria-describedby="error ? `${id}-error` : undefined"
         @input="

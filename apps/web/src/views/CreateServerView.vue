@@ -88,6 +88,7 @@ async function submit(): Promise<void> {
             v-model="name"
             required
             :aria-invalid="fieldErrors.name ? 'true' : undefined"
+            :aria-describedby="fieldErrors.name ? 'name-error' : undefined"
           />
           <p v-if="fieldErrors.name" id="name-error" class="field-error">
             {{ fieldErrors.name }}
@@ -101,6 +102,7 @@ async function submit(): Promise<void> {
               v-model="host"
               required
               :aria-invalid="fieldErrors.host ? 'true' : undefined"
+              :aria-describedby="fieldErrors.host ? 'host-error' : undefined"
             />
             <p v-if="fieldErrors.host" id="host-error" class="field-error">
               {{ fieldErrors.host }}
@@ -115,7 +117,12 @@ async function submit(): Promise<void> {
               min="1"
               max="65535"
               required
+              :aria-invalid="fieldErrors.port ? 'true' : undefined"
+              :aria-describedby="fieldErrors.port ? 'port-error' : undefined"
             />
+            <p v-if="fieldErrors.port" id="port-error" class="field-error">
+              {{ fieldErrors.port }}
+            </p>
           </div>
         </div>
         <div class="field">
@@ -125,7 +132,18 @@ async function submit(): Promise<void> {
             v-model="username"
             autocomplete="username"
             required
+            :aria-invalid="fieldErrors.username ? 'true' : undefined"
+            :aria-describedby="
+              fieldErrors.username ? 'username-error' : undefined
+            "
           />
+          <p
+            v-if="fieldErrors.username"
+            id="username-error"
+            class="field-error"
+          >
+            {{ fieldErrors.username }}
+          </p>
         </div>
         <fieldset class="auth-fieldset">
           <legend>Authentication</legend>
@@ -157,6 +175,7 @@ async function submit(): Promise<void> {
           label="Password"
           autocomplete="new-password"
           :error="fieldErrors.password"
+          required
         />
         <template v-else>
           <div class="field">
@@ -169,6 +188,9 @@ async function submit(): Promise<void> {
               spellcheck="false"
               required
               :aria-invalid="fieldErrors.privateKey ? 'true' : undefined"
+              :aria-describedby="
+                fieldErrors.privateKey ? 'private-key-error' : undefined
+              "
             />
             <p
               v-if="fieldErrors.privateKey"
@@ -185,48 +207,52 @@ async function submit(): Promise<void> {
             :error="fieldErrors.passphrase"
           />
         </template>
-        <p v-if="errorMessage" role="alert" class="form-error">
-          {{ errorMessage }}
-        </p>
         <button class="primary-button" type="submit" :disabled="pending">
           {{ pending ? 'Testing connection...' : 'Test & Save' }}
         </button>
       </form>
-      <aside v-if="savedServer" class="result-panel" aria-live="polite">
-        <p class="status-label">Server saved</p>
-        <h2>{{ savedServer.name }}</h2>
-        <dl>
-          <div>
-            <dt>Endpoint</dt>
-            <dd>
-              {{ savedServer.username }}@{{ savedServer.host }}:{{
-                savedServer.port
-              }}
-            </dd>
-          </div>
-          <div>
-            <dt>Authentication</dt>
-            <dd>
-              {{
-                savedServer.authType === 'privateKey'
-                  ? 'Private key'
-                  : 'Password'
-              }}
-            </dd>
-          </div>
-          <div>
-            <dt>Host key</dt>
-            <dd>{{ savedServer.hostKeyAlgorithm }}</dd>
-          </div>
-          <div>
-            <dt>Fingerprint</dt>
-            <dd class="fingerprint">{{ savedServer.hostKeyFingerprint }}</dd>
-          </div>
-        </dl>
+      <aside
+        data-testid="status-region"
+        class="status-region"
+        :class="{ 'result-panel': savedServer }"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <p v-if="pending" class="status-message">Testing connection...</p>
+        <p v-else-if="errorMessage" class="form-error">{{ errorMessage }}</p>
+        <template v-else-if="savedServer">
+          <p class="status-label">Server saved</p>
+          <h2>{{ savedServer.name }}</h2>
+          <dl>
+            <div>
+              <dt>Endpoint</dt>
+              <dd>
+                {{ savedServer.username }}@{{ savedServer.host }}:{{
+                  savedServer.port
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>Authentication</dt>
+              <dd>
+                {{
+                  savedServer.authType === 'privateKey'
+                    ? 'Private key'
+                    : 'Password'
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>Host key</dt>
+              <dd>{{ savedServer.hostKeyAlgorithm }}</dd>
+            </div>
+            <div>
+              <dt>Fingerprint</dt>
+              <dd class="fingerprint">{{ savedServer.hostKeyFingerprint }}</dd>
+            </div>
+          </dl>
+        </template>
       </aside>
-      <div v-else aria-live="polite" class="sr-only">
-        {{ pending ? 'Testing connection' : '' }}
-      </div>
     </div>
   </main>
 </template>

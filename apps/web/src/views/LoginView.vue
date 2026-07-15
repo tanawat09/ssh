@@ -60,6 +60,7 @@ async function submit(): Promise<void> {
           v-model="password"
           label="Password"
           autocomplete="current-password"
+          required
         />
         <p v-if="errorMessage" role="alert" class="form-error">
           {{ errorMessage }}

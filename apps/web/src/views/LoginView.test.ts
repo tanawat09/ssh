@@ -7,6 +7,14 @@ import LoginView from './LoginView.vue'
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 describe('LoginView', () => {
+  it('requires the administrator password', () => {
+    const wrapper = mount(LoginView, {
+      global: { plugins: [createPinia()] },
+    })
+
+    expect(wrapper.get('#login-password').attributes('required')).toBeDefined()
+  })
+
   it('disables a stable submit command while login is pending', async () => {
     let resolveLogin: (() => void) | undefined
     const login = vi

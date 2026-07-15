@@ -238,6 +238,15 @@ textarea[aria-invalid='true'] {
   padding: 2px 0 2px 20px;
   min-width: 0;
 }
+.status-region {
+  min-width: 0;
+  min-height: 1px;
+}
+.status-message {
+  margin: 0;
+  color: #52606c;
+  font-size: 14px;
+}
 .status-label {
   margin: 0;
   color: #28694e;
