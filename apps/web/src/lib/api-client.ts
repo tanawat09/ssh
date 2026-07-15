@@ -48,7 +48,9 @@ function parseError(value: unknown): ApiError | undefined {
 }
 
 export class ApiClient {
-  constructor(private readonly fetcher: typeof fetch = globalThis.fetch) {}
+  constructor(
+    private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
+  ) {}
 
   login(request: LoginRequest): Promise<SessionDto> {
     return this.request('/api/v1/auth/login', request)

@@ -15,9 +15,9 @@ export default defineConfig(
         projectService: {
           allowDefaultProject: [
             '*.js',
+            'playwright.config.ts',
             'apps/*/*.ts',
             'packages/*/*.ts',
-            'tests/*/*.ts',
           ],
         },
       },

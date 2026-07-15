@@ -1,9 +1,30 @@
 import { ApiErrorCode } from '@remote/shared'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClient, ApiClientError } from './api-client'
 
 describe('ApiClient', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('preserves the browser receiver for the default fetch transport', async () => {
+    const receiverSensitiveFetch = vi.fn(function (
+      this: typeof globalThis,
+    ): Promise<Response> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation')
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ user: { username: 'admin', role: 'admin' } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+    }) as unknown as typeof fetch
+    vi.stubGlobal('fetch', receiverSensitiveFetch)
+
+    await expect(
+      new ApiClient().login({ username: 'admin', password: 'secret' }),
+    ).resolves.toEqual({ user: { username: 'admin', role: 'admin' } })
+  })
+
   it('uses same-origin credentialed requests', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
