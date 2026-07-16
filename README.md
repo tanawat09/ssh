@@ -24,6 +24,12 @@ Generate an Argon2id hash after `npm ci`. Replace the example password before ru
 node --input-type=module -e 'import argon2 from "argon2"; console.log(await argon2.hash(process.argv[1], { type: argon2.argon2id }))' 'choose-a-password'
 ```
 
+Put the complete generated hash inside single quotes in `.env`. Argon2 hashes contain `$` characters, and the quotes prevent Compose interpolation from changing them:
+
+```dotenv
+ADMIN_PASSWORD_HASH='$argon2id$...generated-output...'
+```
+
 Generate independent runtime secrets:
 
 ```bash
@@ -31,7 +37,7 @@ openssl rand -base64 32  # CREDENTIAL_ENCRYPTION_KEY
 openssl rand -base64 48  # JWT_SECRET
 ```
 
-Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, `CREDENTIAL_ENCRYPTION_KEY`, and `JWT_SECRET`. The example file intentionally contains no usable credentials or secrets. Keep the encryption key stable: losing or rotating it without a migration makes stored credentials unreadable.
+Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, the single-quoted `ADMIN_PASSWORD_HASH`, `CREDENTIAL_ENCRYPTION_KEY`, and `JWT_SECRET`. The example file intentionally contains no usable credentials or secrets. Keep the encryption key stable: losing or rotating it without a migration makes stored credentials unreadable.
 
 For local development, also set:
 

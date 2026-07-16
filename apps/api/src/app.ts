@@ -163,6 +163,22 @@ export function buildApp({
   })
 
   app.setErrorHandler((error, _request, reply) => sendError(error, reply))
+  app.get(
+    '/health',
+    {
+      schema: {
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['status'],
+            properties: { status: { type: 'string', const: 'ok' } },
+          },
+        },
+      },
+    },
+    () => ({ status: 'ok' as const }),
+  )
   app.register((instance, _options, done) => {
     registerAuthRoute(instance, { config })
     if (createServerService !== undefined) {

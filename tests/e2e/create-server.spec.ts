@@ -15,6 +15,7 @@ function requiredEnvironment(name: string): string {
 
 const sshPort = Number(requiredEnvironment('E2E_SSH_PORT'))
 const sshPrivateKey = requiredEnvironment('E2E_SSH_PRIVATE_KEY')
+const sshHostKeyFingerprint = requiredEnvironment('E2E_SSH_FINGERPRINT')
 
 async function login(page: Page): Promise<void> {
   await page.goto('/login')
@@ -46,7 +47,9 @@ test('creates password and private-key servers, rejects duplicates, and clears f
   await page.getByRole('textbox', { name: 'Password' }).fill(sshPassword)
   await page.getByRole('button', { name: 'Test & Save' }).click()
   await expect(page.getByText('Server saved')).toBeVisible()
-  await expect(page.getByText(/^SHA256:/)).toBeVisible()
+  await expect(
+    page.getByText(sshHostKeyFingerprint, { exact: true }),
+  ).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Password' })).toHaveValue('')
 
   await page
@@ -70,7 +73,9 @@ test('creates password and private-key servers, rejects duplicates, and clears f
   await page.getByRole('textbox', { name: 'Private key' }).fill(sshPrivateKey)
   await page.getByRole('button', { name: 'Test & Save' }).click()
   await expect(page.getByText('Server saved')).toBeVisible()
-  await expect(page.getByText(/^SHA256:/)).toBeVisible()
+  await expect(
+    page.getByText(sshHostKeyFingerprint, { exact: true }),
+  ).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Private key' })).toHaveValue(
     '',
   )

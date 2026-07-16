@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomBytes } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import { createReadStream, mkdtempSync, rmSync, statSync } from 'node:fs'
 import {
@@ -15,6 +15,7 @@ import ssh2, { type Server as SshServer } from 'ssh2'
 
 const adminPassword = 'e2e-admin-password'
 const sshUsername = 'e2e-ssh-user'
+const mobileSshUsername = 'e2e-mobile-user'
 const sshPassword = 'e2e-ssh-password'
 const webOrigin = 'http://127.0.0.1:4173'
 const apiPort = 3000
@@ -139,47 +140,64 @@ async function terminate(child: ChildProcess): Promise<void> {
 export default async function globalSetup(): Promise<() => Promise<void>> {
   const hostKey = rsaPrivateKey()
   const clientKey = rsaPrivateKey()
+  const parsedHostKey = ssh2.utils.parseKey(hostKey)
   const parsedClientKey = ssh2.utils.parseKey(clientKey)
+  if (parsedHostKey instanceof Error) throw parsedHostKey
   if (parsedClientKey instanceof Error) throw parsedClientKey
+  const hostKeyFingerprint = `SHA256:${createHash('sha256')
+    .update(parsedHostKey.getPublicSSH())
+    .digest('base64')
+    .replace(/=+$/, '')}`
   const clientPublicSsh = parsedClientKey.getPublicSSH()
 
   const sshServer = new ssh2.Server({ hostKeys: [hostKey] }, (client) => {
     client.on('authentication', (context) => {
-      if (context.username !== sshUsername) {
-        context.reject()
-        return
-      }
-      if (context.method === 'password') {
-        if (context.password === sshPassword) {
-          context.accept()
-        } else {
+      const authenticate = (): void => {
+        if (
+          context.username !== sshUsername &&
+          context.username !== mobileSshUsername
+        ) {
           context.reject()
-        }
-        return
-      }
-      if (
-        context.method === 'publickey' &&
-        context.key.data.equals(clientPublicSsh)
-      ) {
-        if (context.signature === undefined) {
-          context.accept()
           return
         }
-        const validSignature =
-          context.blob !== undefined &&
-          parsedClientKey.verify(
-            context.blob,
-            context.signature,
-            context.hashAlgo,
-          )
-        if (validSignature) {
-          context.accept()
-        } else {
-          context.reject()
+        if (context.method === 'password') {
+          if (context.password === sshPassword) {
+            context.accept()
+          } else {
+            context.reject()
+          }
+          return
         }
-        return
+        if (
+          context.method === 'publickey' &&
+          context.key.data.equals(clientPublicSsh)
+        ) {
+          if (context.signature === undefined) {
+            context.accept()
+            return
+          }
+          const validSignature =
+            context.blob !== undefined &&
+            parsedClientKey.verify(
+              context.blob,
+              context.signature,
+              context.hashAlgo,
+            )
+          if (validSignature) {
+            context.accept()
+          } else {
+            context.reject()
+          }
+          return
+        }
+        context.reject()
       }
-      context.reject()
+
+      if (context.username === mobileSshUsername) {
+        setTimeout(authenticate, 150)
+      } else {
+        authenticate()
+      }
     })
   })
   const sshPort = await listen(sshServer)
@@ -209,6 +227,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     const webServer = await startWebServer()
     process.env.E2E_SSH_PORT = String(sshPort)
     process.env.E2E_SSH_PRIVATE_KEY = clientKey
+    process.env.E2E_SSH_FINGERPRINT = hostKeyFingerprint
 
     return async () => {
       await new Promise<void>((resolve, reject) => {
