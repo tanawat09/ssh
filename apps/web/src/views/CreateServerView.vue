@@ -75,6 +75,7 @@ async function submit(): Promise<void> {
         <p class="eyebrow">Remote Admin</p>
         <h1>Create server</h1>
       </div>
+      <RouterLink class="back-link" to="/servers">Back to servers</RouterLink>
       <span v-if="session.user" class="session-user">{{
         session.user.username
       }}</span>
