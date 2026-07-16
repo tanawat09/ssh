@@ -70,10 +70,19 @@ export class ApiClient {
       credentials: 'include',
     })
     let value: unknown
-    try { value = await response.json() } catch { value = undefined }
+    try {
+      value = await response.json()
+    } catch {
+      value = undefined
+    }
     if (!response.ok) {
       const parsed = parseError(value)
-      throw new ApiClientError(response.status, parsed?.error.code ?? ApiErrorCode.INTERNAL_ERROR, parsed?.error.message ?? 'Request failed. Please try again.', parsed?.error.fields)
+      throw new ApiClientError(
+        response.status,
+        parsed?.error.code ?? ApiErrorCode.INTERNAL_ERROR,
+        parsed?.error.message ?? 'Request failed. Please try again.',
+        parsed?.error.fields,
+      )
     }
     return value as T
   }
