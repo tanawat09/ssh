@@ -1,9 +1,6 @@
 import { ApiErrorCode, type ServerDto } from '@remote/shared'
 
-import type {
-  AuditRepository,
-  AuditEvent,
-} from '../database/audit-repository.js'
+import type { AuditRepository } from '../database/audit-repository.js'
 import type { ServerRepository } from '../database/server-repository.js'
 import { ApplicationError } from '../domain/application-error.js'
 import { randomUUID } from 'node:crypto'

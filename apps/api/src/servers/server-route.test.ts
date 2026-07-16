@@ -62,6 +62,14 @@ async function setup(execute = vi.fn(() => Promise.resolve(dto))) {
   return { app, execute, token }
 }
 
+async function setupList(execute = vi.fn(() => Promise.resolve([dto]))) {
+  const app = buildApp({ config, listServerService: { execute } })
+  apps.push(app)
+  await app.ready()
+  const token = app.jwt.sign({ sub: 'admin', role: 'admin' })
+  return { app, execute, token }
+}
+
 async function setupWithConfig(
   configured: AppConfig,
   execute = vi.fn(() => Promise.resolve(dto)),
@@ -194,5 +202,40 @@ describe('POST /api/v1/servers', () => {
       },
     })
     expect(response.body).not.toMatch(/SQLITE|password-secret/)
+  })
+})
+
+describe('GET /api/v1/servers', () => {
+  it('requires authentication and permission', async () => {
+    const { app, token } = await setupList()
+    const unauthenticated = await app.inject({
+      method: 'GET',
+      url: '/api/v1/servers',
+      headers: { origin },
+    })
+    const viewer = app.jwt.sign({ sub: 'viewer', role: 'viewer' })
+    const forbidden = await app.inject({
+      method: 'GET',
+      url: '/api/v1/servers',
+      headers: { origin, cookie: `remote_session=${viewer}` },
+    })
+    expect(unauthenticated.statusCode).toBe(401)
+    expect(forbidden.statusCode).toBe(403)
+    expect(token).toBeTruthy()
+  })
+
+  it('returns servers and passes authenticated actor/source to service', async () => {
+    const { app, execute, token } = await setupList()
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/servers',
+      headers: { origin, cookie: `remote_session=${token}` },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual([dto])
+    expect(execute).toHaveBeenCalledWith({
+      actor: 'admin',
+      sourceIp: '127.0.0.1',
+    })
   })
 })

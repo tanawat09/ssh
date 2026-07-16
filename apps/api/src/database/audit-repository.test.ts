@@ -20,6 +20,39 @@ afterEach(() => {
 })
 
 describe('AuditRepository', () => {
+  it('records successful list metadata and sanitizes invalid counts', () => {
+    const database = createDatabase()
+    const repository = new AuditRepository(database)
+    repository.recordSuccess({
+      id: 'audit-success-1',
+      action: 'server.list',
+      result: 'success',
+      actor: 'admin',
+      targetType: 'server',
+      sourceIp: '127.0.0.1',
+      metadata: { resource: 'server', count: 2, password: 'secret' },
+      createdAt: '2026-07-12T00:00:00.000Z',
+    })
+    repository.recordSuccess({
+      id: 'audit-success-2',
+      action: 'server.list',
+      result: 'success',
+      actor: 'admin',
+      targetType: 'server',
+      metadata: { resource: 'server', count: -1 },
+      createdAt: '2026-07-12T00:00:01.000Z',
+    })
+    const rows = database
+      .prepare('SELECT metadata FROM audit_logs ORDER BY id')
+      .all() as Array<{ metadata: string }>
+    expect(JSON.parse(rows[0]?.metadata ?? '{}')).toEqual({
+      resource: 'server',
+      count: 2,
+    })
+    expect(JSON.parse(rows[1]?.metadata ?? '{}')).toEqual({
+      resource: 'server',
+    })
+  })
   it('records only allow-listed metadata for a failed create attempt', () => {
     const database = createDatabase()
     const repository = new AuditRepository(database)
