@@ -77,12 +77,37 @@ function validateNodeEnv(nodeEnv: string | undefined): AppConfig['nodeEnv'] {
 }
 
 function validateAdminPasswordHash(hash: string): string {
-  if (
-    !/^\$argon2id\$v=19\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/.test(
+  const parsed =
+    /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/.exec(
       hash,
     )
-  ) {
+  if (parsed === null) {
     throw new Error('ADMIN_PASSWORD_HASH must be an Argon2id PHC string')
+  }
+
+  const memoryCost = Number(parsed[1])
+  const timeCost = Number(parsed[2])
+  const parallelism = Number(parsed[3])
+  const saltLength = Buffer.from(parsed[4] ?? '', 'base64').length
+  const hashLength = Buffer.from(parsed[5] ?? '', 'base64').length
+  if (
+    !Number.isSafeInteger(memoryCost) ||
+    memoryCost < 19_456 ||
+    memoryCost > 262_144 ||
+    !Number.isSafeInteger(timeCost) ||
+    timeCost < 2 ||
+    timeCost > 10 ||
+    !Number.isSafeInteger(parallelism) ||
+    parallelism < 1 ||
+    parallelism > 16 ||
+    saltLength < 8 ||
+    saltLength > 64 ||
+    hashLength < 16 ||
+    hashLength > 64
+  ) {
+    throw new Error(
+      'ADMIN_PASSWORD_HASH Argon2id costs or field lengths are outside supported bounds',
+    )
   }
   return hash
 }

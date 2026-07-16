@@ -113,7 +113,7 @@ describe('POST /api/v1/servers', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('passes the public client IP through a trusted private production proxy chain', async () => {
+  it('uses the immediate client reported by nginx instead of a forged leftmost forwarded IP', async () => {
     const { app, execute, token } = await setupWithConfig({
       ...config,
       nodeEnv: 'production',
@@ -130,7 +130,7 @@ describe('POST /api/v1/servers', () => {
     expect(response.statusCode).toBe(201)
     expect(execute).toHaveBeenCalledWith(passwordRequest, {
       actor: 'admin',
-      sourceIp: '198.51.100.42',
+      sourceIp: '10.0.0.8',
     })
   })
 

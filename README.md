@@ -47,7 +47,7 @@ export ALLOWED_ORIGIN=http://localhost:5173
 export DATABASE_PATH=./remote.sqlite
 ```
 
-Export the four required values from `.env`, then run:
+Export the five required values from `.env`, then run:
 
 ```bash
 npm run dev
@@ -68,7 +68,7 @@ docker compose ps
 
 Open `http://localhost:8080`. The web container is an unprivileged Nginx process and proxies `/api/*` to the non-root API container. SQLite data is stored in the `remote-data` named volume.
 
-For production, terminate TLS in a trusted reverse proxy in front of the web container and set `ALLOWED_ORIGIN` to the exact public HTTPS origin, for example `https://remote.example.com` (no trailing slash or path). The TLS proxy must replace or preserve accurate `X-Forwarded-For` and `X-Forwarded-Proto: https` headers. Do not publish the API container directly: Fastify accepts forwarded client identity only from loopback, RFC 1918, and unique-local proxy hops, and Compose intentionally exposes only the web service. Production session cookies remain `Secure`.
+For production, terminate TLS in a trusted reverse proxy in front of the web container and set `ALLOWED_ORIGIN` to the exact public HTTPS origin, for example `https://remote.example.com` (no trailing slash or path). The TLS proxy must set `X-Forwarded-Proto: https`. Nginx discards inbound `X-Forwarded-For` values and reports its direct peer to the API, and Fastify trusts exactly that one Nginx hop. This prevents clients, including private-network peers, from forging login-limit and audit identity. By default an external TLS terminator is therefore the recorded source IP. Accurate end-client attribution through that terminator requires a deployment-specific Nginx `set_real_ip_from` rule limited to the terminator's exact stable address; never trust a broad private range. Do not publish the API container directly: Compose intentionally exposes only the web service, and the one-hop Fastify boundary depends on that topology. Production session cookies remain `Secure`.
 
 Login limiting is an in-memory, single-API-process rolling window: each source IP gets five attempts per 15 minutes. It is not shared across replicas. The store caps live source keys at 5,000 and fails closed for previously unseen sources while at capacity; operators must monitor repeated `429` responses and restart only after investigating abusive traffic.
 

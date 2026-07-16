@@ -67,6 +67,47 @@ describe('loadConfig', () => {
     ).toThrow('ADMIN_PASSWORD_HASH must be an Argon2id PHC string')
   })
 
+  it.each([
+    '$argon2id$v=19$m=0,t=3,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=19455,t=3,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=262145,t=3,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=65536,t=1,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=65536,t=11,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=65536,t=3,p=0$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=65536,t=3,p=17$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
+    '$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$YWJjZGVmZ2hpamtsbW5vcA',
+    `$argon2id$v=19$m=65536,t=3,p=4$${Buffer.alloc(65, 1)
+      .toString('base64')
+      .replace(/=+$/, '')}$YWJjZGVmZ2hpamtsbW5vcA`,
+    `$argon2id$v=19$m=65536,t=3,p=4$c2FsdC1ieXRlcw$${Buffer.alloc(15, 1)
+      .toString('base64')
+      .replace(/=+$/, '')}`,
+    `$argon2id$v=19$m=65536,t=3,p=4$c2FsdC1ieXRlcw$${Buffer.alloc(65, 1)
+      .toString('base64')
+      .replace(/=+$/, '')}`,
+  ])(
+    'rejects unsafe Argon2id costs or decoded field lengths',
+    (adminPasswordHash) => {
+      expect(() =>
+        loadConfig({ ...validEnv, ADMIN_PASSWORD_HASH: adminPasswordHash }),
+      ).toThrow(
+        'ADMIN_PASSWORD_HASH Argon2id costs or field lengths are outside supported bounds',
+      )
+    },
+  )
+
+  it('accepts inclusive Argon2id cost and decoded field bounds', () => {
+    const salt = Buffer.alloc(8, 1).toString('base64').replace(/=+$/, '')
+    const hash = Buffer.alloc(16, 2).toString('base64').replace(/=+$/, '')
+
+    expect(
+      loadConfig({
+        ...validEnv,
+        ADMIN_PASSWORD_HASH: `$argon2id$v=19$m=19456,t=2,p=1$${salt}$${hash}`,
+      }).adminPasswordHash,
+    ).toContain('m=19456,t=2,p=1')
+  })
+
   it.each(['staging', 'Production', ''])(
     'rejects invalid NODE_ENV %j',
     (nodeEnv) => {
