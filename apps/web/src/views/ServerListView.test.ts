@@ -26,7 +26,9 @@ function mountView(listServers: () => Promise<ServerDto[]>) {
   return mount(ServerListView, {
     global: {
       plugins: [createPinia()],
-      stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      stubs: {
+        RouterLink: { template: '<a v-bind="$attrs"><slot /></a>' },
+      },
     },
     props: { listServers },
   })
@@ -51,6 +53,12 @@ describe('ServerListView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('No servers yet.')
     expect(wrapper.find('.server-row').exists()).toBe(false)
+  })
+
+  it('links to the create-server route', async () => {
+    const wrapper = mountView(vi.fn().mockResolvedValue([]))
+    await flushPromises()
+    expect(wrapper.get('a').attributes('to')).toBe('/servers/new')
   })
 
   it('renders public server fields without credential-like data', async () => {

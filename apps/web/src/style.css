@@ -369,6 +369,34 @@ dd {
   .app-shell {
     padding: 24px 18px 40px;
   }
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .server-row {
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  .server-row > div {
+    min-width: 0;
+  }
+  .server-row p {
+    overflow-wrap: anywhere;
+  }
+  .server-row dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    text-align: left;
+  }
+  .server-row dd {
+    overflow-wrap: anywhere;
+  }
   .content-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 30px;
@@ -379,6 +407,22 @@ dd {
 }
 
 @media (max-width: 420px) {
+  .header-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .header-button {
+    justify-content: center;
+    width: 100%;
+  }
+  .server-row {
+    padding: 16px;
+  }
+  .server-row dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
   .connection-grid {
     grid-template-columns: minmax(0, 1fr);
   }
