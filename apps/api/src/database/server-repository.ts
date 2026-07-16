@@ -35,6 +35,7 @@ function isEndpointUniqueConstraint(error: unknown): boolean {
 
 export class ServerRepository {
   readonly #existsByEndpoint: Database.Statement
+  readonly #listAll: Database.Statement
   readonly #insertServer: Database.Statement
   readonly #insertCredential: Database.Statement
   readonly #insertSuccessAudit: Database.Statement
@@ -50,6 +51,12 @@ export class ServerRepository {
       FROM servers
       WHERE lower(host) = lower(?) AND port = ? AND username = ?
       LIMIT 1
+    `)
+    this.#listAll = database.prepare(`
+      SELECT id, name, host, port, username, auth_type,
+        host_key_algorithm, host_key_fingerprint, created_at, updated_at
+      FROM servers
+      ORDER BY created_at ASC
     `)
     this.#insertServer = database.prepare(`
       INSERT INTO servers (
@@ -117,6 +124,33 @@ export class ServerRepository {
         endpoint.username,
       ) !== undefined
     )
+  }
+
+  listAll(): ServerDto[] {
+    const rows = this.#listAll.all() as Array<{
+      id: string
+      name: string
+      host: string
+      port: number
+      username: string
+      auth_type: ServerDto['authType']
+      host_key_algorithm: string
+      host_key_fingerprint: string
+      created_at: string
+      updated_at: string
+    }>
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      authType: row.auth_type,
+      hostKeyAlgorithm: row.host_key_algorithm,
+      hostKeyFingerprint: row.host_key_fingerprint,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
   }
 
   createWithAudit(

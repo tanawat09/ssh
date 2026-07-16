@@ -117,6 +117,22 @@ describe('ServerRepository', () => {
     ).toBe(false)
   })
 
+  it('lists public servers in creation order without secrets', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+    repository.createWithAudit(serverRecord(), encryptedCredential, successEvent())
+    repository.createWithAudit(
+      serverRecord({ id: 'server-2', name: 'Staging', createdAt: '2026-07-13T00:00:00.000Z', updatedAt: '2026-07-13T00:00:00.000Z', host: 'staging.example.com' }),
+      encryptedCredential,
+      successEvent({ id: 'audit-2', targetId: 'server-2' }),
+    )
+    expect(repository.listAll()).toEqual([
+      expect.objectContaining({ id: 'server-1', name: 'Production', host: 'server.example.com' }),
+      expect.objectContaining({ id: 'server-2', name: 'Staging', host: 'staging.example.com' }),
+    ])
+    expect(repository.listAll()[0]).not.toHaveProperty('hostKeyBase64')
+  })
+
   it('persists a server, encrypted credential, and success audit event together', () => {
     const database = createDatabase()
     const repository = new ServerRepository(database)

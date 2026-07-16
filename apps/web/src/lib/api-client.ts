@@ -60,6 +60,24 @@ export class ApiClient {
     return this.request('/api/v1/servers', request)
   }
 
+  listServers(): Promise<ServerDto[]> {
+    return this.get('/api/v1/servers')
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    const response = await this.fetcher(path, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    let value: unknown
+    try { value = await response.json() } catch { value = undefined }
+    if (!response.ok) {
+      const parsed = parseError(value)
+      throw new ApiClientError(response.status, parsed?.error.code ?? ApiErrorCode.INTERNAL_ERROR, parsed?.error.message ?? 'Request failed. Please try again.', parsed?.error.fields)
+    }
+    return value as T
+  }
+
   private async request<T>(path: string, body: unknown): Promise<T> {
     const response = await this.fetcher(path, {
       method: 'POST',

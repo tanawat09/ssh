@@ -49,6 +49,17 @@ describe('ApiClient', () => {
     })
   })
 
+  it('lists servers with a credentialed GET and no body', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+    await expect(new ApiClient(fetcher).listServers()).resolves.toEqual([])
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/servers', {
+      method: 'GET',
+      credentials: 'include',
+    })
+  })
+
   it('parses typed API errors', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
