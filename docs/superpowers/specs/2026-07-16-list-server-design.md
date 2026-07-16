@@ -2,8 +2,9 @@
 
 ## Scope
 
-Add the read-only server listing capability for MVP Phase 1. Every successful
-and failed list request creates a `server.list` audit event. No credentials,
+Add the read-only server listing capability for MVP Phase 1. Every authenticated
+list execution, whether successful or failed, creates a `server.list` audit
+event. No credentials,
 private keys, encrypted payloads, or host-key material are returned to the
 client or written to audit metadata.
 

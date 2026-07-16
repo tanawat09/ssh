@@ -13,7 +13,9 @@
 - Do not return or persist passwords, private keys, encrypted credential payloads, or host-key bytes in list responses or audit metadata.
 - Require the existing `servers:read` permission and preserve JWT HttpOnly-cookie authentication.
 - Keep the endpoint additive and preserve the existing `ServerDto` contract.
-- Record one `server.list` audit event for every request, including failures.
+- Record one `server.list` audit event for every authenticated list execution,
+  including service/repository failures; unauthenticated and forbidden requests
+  remain handled by the existing permission layer.
 - Do not add pagination, search, delete, terminal, SFTP, or client-side secret storage.
 - Use TDD: each production change follows a failing test and a passing verification.
 
@@ -88,7 +90,7 @@ Run `npm test -w @remote/api -- audit-repository.test.ts list-server-service.tes
 
 - [ ] **Step 3: Implement list service and audit helper**
 
-Write the service with a single try/catch: call `listAll`, write one success audit with count, or write one failure audit with only `{ resource: 'server' }` and convert unknown errors to the existing generic internal error.
+Extend audit metadata sanitization with a bounded numeric `count` field. Write the service with a single try/catch: call `listAll`, write one success audit with count, or write one failure audit with only `{ resource: 'server' }` and convert unknown errors to the existing generic internal error.
 
 - [ ] **Step 4: Register the protected GET route**
 
@@ -173,4 +175,3 @@ Run `docker compose config --quiet`, build the API/web images, start the stack w
 - [ ] **Step 5: Review the diff and commit the verification report**
 
 Run `git diff --check`, inspect changed files for secret leakage and scope expansion, record results in `.superpowers/sdd/list-server-report.md` (ignored), and commit any required test-only changes.
-
