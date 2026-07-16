@@ -92,7 +92,7 @@ export function registerAuthRoute(
         },
       },
     },
-    (): Promise<SessionDto> => ({
+    (): SessionDto => ({
       user: { username: config.adminUsername, role: 'admin' },
     }),
   )
