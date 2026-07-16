@@ -13,6 +13,12 @@ const passwordRequest: CreateServerRequest = {
   authType: 'password',
   password: 'secret',
 }
+const privateKeyRequest: CreateServerRequest = {
+  ...passwordRequest,
+  authType: 'privateKey',
+  privateKey: 'private-key-secret',
+  passphrase: 'passphrase-secret',
+}
 
 function dependencies(overrides: Record<string, unknown> = {}) {
   const order: string[] = []
@@ -147,6 +153,74 @@ describe('CreateServerService', () => {
     const event = deps.auditRepository.recordFailure.mock.calls[0]?.[0]
     expect(JSON.stringify(event?.metadata)).not.toContain('secret')
   })
+
+  it('forwards a private key and passphrase only to SSH and credential encryption', async () => {
+    const { service: subject, deps } = service()
+
+    await subject.execute(privateKeyRequest, { actor: 'admin' })
+
+    expect(deps.credentialCipher.encrypt).toHaveBeenCalledWith({
+      authType: 'privateKey',
+      privateKey: 'private-key-secret',
+      passphrase: 'passphrase-secret',
+    })
+    expect(
+      JSON.stringify(deps.serverRepository.createWithAudit.mock.calls),
+    ).not.toMatch(/private-key-secret|passphrase-secret/)
+  })
+
+  it.each([
+    [
+      'encryption',
+      (deps: ReturnType<typeof dependencies>) => {
+        deps.credentialCipher.encrypt.mockImplementation(() => {
+          throw new Error('cipher leaked private-key-secret')
+        })
+      },
+    ],
+    [
+      'persistence',
+      (deps: ReturnType<typeof dependencies>) => {
+        deps.serverRepository.createWithAudit.mockImplementation(() => {
+          throw new Error('SQLITE leaked passphrase-secret')
+        })
+      },
+    ],
+  ] as const)(
+    'sanitizes an unexpected %s failure and records only stable audit metadata',
+    async (_stage, fail) => {
+      const deps = dependencies()
+      fail(deps)
+      const subject = service(deps).service
+
+      await expect(
+        subject.execute(privateKeyRequest, {
+          actor: 'admin',
+          sourceIp: '198.51.100.5',
+        }),
+      ).rejects.toMatchObject({
+        code: ApiErrorCode.INTERNAL_ERROR,
+        statusCode: 500,
+        message: 'Internal server error',
+      })
+      const event = deps.auditRepository.recordFailure.mock.calls[0]?.[0]
+      expect(event).toMatchObject({
+        sourceIp: '198.51.100.5',
+        metadata: {
+          host: 'server.example.com',
+          port: 22,
+          username: 'Deploy',
+          authType: 'privateKey',
+          errorCode: ApiErrorCode.INTERNAL_ERROR,
+          tofuAccepted: true,
+          hostKeyFingerprint: 'SHA256:fingerprint',
+        },
+      })
+      expect(JSON.stringify(event)).not.toMatch(
+        /private-key-secret|passphrase-secret|cipher leaked|SQLITE leaked/,
+      )
+    },
+  )
 
   it.each([
     ApiErrorCode.SSH_AUTHENTICATION_FAILED,

@@ -43,6 +43,7 @@ const encryptedClientKeyBlob = parsedEncryptedClientKey.getPublicSSH()
 interface RunningSshServer {
   close(): Promise<void>
   port: number
+  waitForConnectionClose(): Promise<void>
 }
 
 function makeRequest(
@@ -83,9 +84,16 @@ async function closeServer(
 
 async function startSshServer(): Promise<RunningSshServer> {
   const connections = new Set<Connection>()
+  let resolveConnectionClose: () => void = () => undefined
+  const connectionClosed = new Promise<void>((resolve) => {
+    resolveConnectionClose = resolve
+  })
   const server = new Server({ hostKeys: [hostKey.private] }, (connection) => {
     connections.add(connection)
-    connection.once('close', () => connections.delete(connection))
+    connection.once('close', () => {
+      connections.delete(connection)
+      resolveConnectionClose()
+    })
     connection.on('authentication', (context) => {
       const validPassword =
         context.method === 'password' &&
@@ -108,6 +116,26 @@ async function startSshServer(): Promise<RunningSshServer> {
   return {
     port: await listen(server),
     close: () => closeServer(server, connections),
+    waitForConnectionClose: async () => {
+      let guard: NodeJS.Timeout | undefined
+      try {
+        await Promise.race([
+          connectionClosed,
+          new Promise<never>((_resolve, reject) => {
+            guard = setTimeout(
+              () => {
+                reject(new Error('SSH client connection remained open'))
+              },
+              1_000,
+            )
+          }),
+        ])
+      } finally {
+        if (guard !== undefined) {
+          clearTimeout(guard)
+        }
+      }
+    },
   }
 }
 
@@ -247,6 +275,7 @@ describe('SshGateway', () => {
         name: 'ApplicationError',
         statusCode: 422,
       } satisfies Partial<ApplicationError>)
+      await server.waitForConnectionClose()
       expect(end).toHaveBeenCalledTimes(1)
     } finally {
       await server.close()

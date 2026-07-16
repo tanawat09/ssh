@@ -62,6 +62,17 @@ async function setup(execute = vi.fn(() => Promise.resolve(dto))) {
   return { app, execute, token }
 }
 
+async function setupWithConfig(
+  configured: AppConfig,
+  execute = vi.fn(() => Promise.resolve(dto)),
+) {
+  const app = buildApp({ config: configured, createServerService: { execute } })
+  apps.push(app)
+  await app.ready()
+  const token = app.jwt.sign({ sub: 'admin', role: 'admin' })
+  return { app, execute, token }
+}
+
 function request(token: string, payload: object = passwordRequest) {
   return {
     method: 'POST' as const,
@@ -100,6 +111,27 @@ describe('POST /api/v1/servers', () => {
       error: { code: ApiErrorCode.INVALID_REQUEST, message: 'Invalid request' },
     })
     expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('passes the public client IP through a trusted private production proxy chain', async () => {
+    const { app, execute, token } = await setupWithConfig({
+      ...config,
+      nodeEnv: 'production',
+    })
+    const response = await app.inject({
+      ...request(token),
+      remoteAddress: '172.20.0.2',
+      headers: {
+        ...request(token).headers,
+        'x-forwarded-for': '198.51.100.42, 10.0.0.8',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(execute).toHaveBeenCalledWith(passwordRequest, {
+      actor: 'admin',
+      sourceIp: '198.51.100.42',
+    })
   })
 
   it('requires authentication and permission', async () => {

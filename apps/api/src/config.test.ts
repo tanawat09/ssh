@@ -4,7 +4,8 @@ import { loadConfig } from './config.js'
 
 const validEnv = {
   ADMIN_USERNAME: 'admin',
-  ADMIN_PASSWORD_HASH: '$argon2id$v=19$test',
+  ADMIN_PASSWORD_HASH:
+    '$argon2id$v=19$m=65536,t=3,p=4$c2FsdC1ieXRlcw$YWJjZGVmZ2hpamtsbW5vcA',
   JWT_SECRET: 'a-secure-test-jwt-secret-with-32-bytes',
   CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
   ALLOWED_ORIGIN: 'https://remote.example.test',
@@ -54,6 +55,42 @@ describe('loadConfig', () => {
       jwtSecret,
     )
   })
+
+  it.each([
+    '$argon2i$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA',
+    '$argon2id$v=18$m=65536,t=3,p=4$c2FsdA$aGFzaA',
+    '$argon2id$v=19$test',
+    'not-a-password-hash',
+  ])('rejects a malformed Argon2id password hash', (adminPasswordHash) => {
+    expect(() =>
+      loadConfig({ ...validEnv, ADMIN_PASSWORD_HASH: adminPasswordHash }),
+    ).toThrow('ADMIN_PASSWORD_HASH must be an Argon2id PHC string')
+  })
+
+  it.each(['staging', 'Production', ''])(
+    'rejects invalid NODE_ENV %j',
+    (nodeEnv) => {
+      expect(() => loadConfig({ ...validEnv, NODE_ENV: nodeEnv })).toThrow(
+        'NODE_ENV must be one of development, test, production',
+      )
+    },
+  )
+
+  it.each([
+    'remote.example.test',
+    'ftp://remote.example.test',
+    'https://remote.example.test/',
+    'https://remote.example.test/path',
+    'https://remote.example.test?query=value',
+    'https://remote.example.test#fragment',
+  ])(
+    'rejects ALLOWED_ORIGIN value %j that is not an exact web origin',
+    (origin) => {
+      expect(() => loadConfig({ ...validEnv, ALLOWED_ORIGIN: origin })).toThrow(
+        'ALLOWED_ORIGIN must be an absolute HTTP(S) origin without a path, query, or fragment',
+      )
+    },
+  )
 
   it.each(['999', '60001', '1000.5', 'not-a-number'])(
     'rejects invalid SSH_CONNECT_TIMEOUT_MS value %s',

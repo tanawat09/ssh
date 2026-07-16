@@ -1,5 +1,5 @@
 export interface AppConfig {
-  nodeEnv: string
+  nodeEnv: 'development' | 'test' | 'production'
   adminUsername: string
   adminPasswordHash: string
   jwtSecret: string
@@ -68,15 +68,51 @@ function validateJwtSecret(secret: string): string {
   return secret
 }
 
+function validateNodeEnv(nodeEnv: string | undefined): AppConfig['nodeEnv'] {
+  const value = nodeEnv ?? 'development'
+  if (!['development', 'test', 'production'].includes(value)) {
+    throw new Error('NODE_ENV must be one of development, test, production')
+  }
+  return value as AppConfig['nodeEnv']
+}
+
+function validateAdminPasswordHash(hash: string): string {
+  if (
+    !/^\$argon2id\$v=19\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/.test(
+      hash,
+    )
+  ) {
+    throw new Error('ADMIN_PASSWORD_HASH must be an Argon2id PHC string')
+  }
+  return hash
+}
+
+function validateAllowedOrigin(origin: string): string {
+  try {
+    const parsed = new URL(origin)
+    if (
+      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+      parsed.origin !== origin
+    ) {
+      throw new Error()
+    }
+  } catch {
+    throw new Error(
+      'ALLOWED_ORIGIN must be an absolute HTTP(S) origin without a path, query, or fragment',
+    )
+  }
+  return origin
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   const values = Object.fromEntries(
     requiredVariables.map((name) => [name, requireVariable(env, name)]),
   ) as Record<RequiredVariable, string>
 
   return {
-    nodeEnv: env.NODE_ENV ?? 'development',
+    nodeEnv: validateNodeEnv(env.NODE_ENV),
     adminUsername: values.ADMIN_USERNAME,
-    adminPasswordHash: values.ADMIN_PASSWORD_HASH,
+    adminPasswordHash: validateAdminPasswordHash(values.ADMIN_PASSWORD_HASH),
     jwtSecret: validateJwtSecret(values.JWT_SECRET),
     jwtExpiresInSeconds: parseBoundedInteger(
       env,
@@ -88,7 +124,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     credentialEncryptionKey: decodeCredentialEncryptionKey(
       values.CREDENTIAL_ENCRYPTION_KEY,
     ),
-    allowedOrigin: values.ALLOWED_ORIGIN,
+    allowedOrigin: validateAllowedOrigin(values.ALLOWED_ORIGIN),
     databasePath: values.DATABASE_PATH,
     sshConnectTimeoutMs: parseBoundedInteger(
       env,

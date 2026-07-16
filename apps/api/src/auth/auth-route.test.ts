@@ -176,6 +176,53 @@ describe('POST /api/v1/auth/login', () => {
     expect(response.body).not.toContain(passwordHash)
   })
 
+  it('uses independent login budgets for public clients forwarded by a private production proxy', async () => {
+    const app = createApp(createConfig({ nodeEnv: 'production' }))
+    const requestFor = (clientIp: string) => ({
+      method: 'POST' as const,
+      url: '/api/v1/auth/login',
+      headers: { ...loginHeaders(), 'x-forwarded-for': clientIp },
+      remoteAddress: '172.20.0.2',
+      payload: { username: 'admin', password: 'wrong-password' },
+    })
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await app.inject(requestFor('198.51.100.10'))).statusCode).toBe(
+        401,
+      )
+    }
+
+    expect((await app.inject(requestFor('198.51.100.10'))).statusCode).toBe(429)
+    expect((await app.inject(requestFor('203.0.113.20'))).statusCode).toBe(401)
+  })
+
+  it('ignores forwarded client identity from an untrusted public peer', async () => {
+    const app = createApp(createConfig({ nodeEnv: 'production' }))
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        headers: {
+          ...loginHeaders(),
+          'x-forwarded-for': `198.51.100.${String(attempt + 1)}`,
+        },
+        remoteAddress: '203.0.113.30',
+        payload: { username: 'admin', password: 'wrong-password' },
+      })
+      expect(response.statusCode).toBe(401)
+    }
+
+    const blocked = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      headers: { ...loginHeaders(), 'x-forwarded-for': '198.51.100.99' },
+      remoteAddress: '203.0.113.30',
+      payload: { username: 'admin', password: 'wrong-password' },
+    })
+    expect(blocked.statusCode).toBe(429)
+  })
+
   it('keeps attempts made near the end of a rolling window', async () => {
     const app = createApp()
     const request = {

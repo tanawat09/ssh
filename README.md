@@ -37,7 +37,7 @@ openssl rand -base64 32  # CREDENTIAL_ENCRYPTION_KEY
 openssl rand -base64 48  # JWT_SECRET
 ```
 
-Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, the single-quoted `ADMIN_PASSWORD_HASH`, `CREDENTIAL_ENCRYPTION_KEY`, and `JWT_SECRET`. The example file intentionally contains no usable credentials or secrets. Keep the encryption key stable: losing or rotating it without a migration makes stored credentials unreadable.
+Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, the single-quoted `ADMIN_PASSWORD_HASH`, `CREDENTIAL_ENCRYPTION_KEY`, `JWT_SECRET`, and `ALLOWED_ORIGIN`. The example file intentionally contains no usable credentials or secrets. Keep the encryption key stable: losing or rotating it without a migration makes stored credentials unreadable.
 
 For local development, also set:
 
@@ -67,6 +67,10 @@ docker compose ps
 ```
 
 Open `http://localhost:8080`. The web container is an unprivileged Nginx process and proxies `/api/*` to the non-root API container. SQLite data is stored in the `remote-data` named volume.
+
+For production, terminate TLS in a trusted reverse proxy in front of the web container and set `ALLOWED_ORIGIN` to the exact public HTTPS origin, for example `https://remote.example.com` (no trailing slash or path). The TLS proxy must replace or preserve accurate `X-Forwarded-For` and `X-Forwarded-Proto: https` headers. Do not publish the API container directly: Fastify accepts forwarded client identity only from loopback, RFC 1918, and unique-local proxy hops, and Compose intentionally exposes only the web service. Production session cookies remain `Secure`.
+
+Login limiting is an in-memory, single-API-process rolling window: each source IP gets five attempts per 15 minutes. It is not shared across replicas. The store caps live source keys at 5,000 and fails closed for previously unseen sources while at capacity; operators must monitor repeated `429` responses and restart only after investigating abusive traffic.
 
 Stop the deployment without deleting its database volume:
 
