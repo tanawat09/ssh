@@ -16,7 +16,10 @@ export interface CreateServerExecutor {
   ): Promise<ServerDto>
 }
 export interface ListServerExecutor {
-  execute(context: { actor: string; sourceIp?: string }): Promise<ServerDto[]>
+  execute(context: {
+    actor: string
+    sourceIp?: string
+  }): Promise<ServerDto[]> | ServerDto[]
 }
 
 export function registerServerRoute(

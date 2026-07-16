@@ -44,7 +44,7 @@ describe('AuditRepository', () => {
     })
     const rows = database
       .prepare('SELECT metadata FROM audit_logs ORDER BY id')
-      .all() as Array<{ metadata: string }>
+      .all() as { metadata: string }[]
     expect(JSON.parse(rows[0]?.metadata ?? '{}')).toEqual({
       resource: 'server',
       count: 2,

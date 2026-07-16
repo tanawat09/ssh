@@ -20,7 +20,7 @@ const servers: ServerDto[] = [
 ]
 
 describe('ListServerService', () => {
-  it('returns repository servers and records count/source audit', async () => {
+  it('returns repository servers and records count/source audit', () => {
     const recordSuccess = vi.fn()
     const service = new ListServerService({
       serverRepository: { listAll: vi.fn(() => servers) },
@@ -28,9 +28,9 @@ describe('ListServerService', () => {
       generateId: () => 'audit-1',
       now: () => new Date('2026-07-12T01:00:00.000Z'),
     })
-    await expect(
-      service.execute({ actor: 'admin', sourceIp: '127.0.0.1' }),
-    ).resolves.toEqual(servers)
+    expect(service.execute({ actor: 'admin', sourceIp: '127.0.0.1' })).toEqual(
+      servers,
+    )
     expect(recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'audit-1',
@@ -44,7 +44,7 @@ describe('ListServerService', () => {
     )
   })
 
-  it('records failure and maps unexpected repository errors', async () => {
+  it('records failure and maps unexpected repository errors', () => {
     const recordFailure = vi.fn()
     const service = new ListServerService({
       serverRepository: {
@@ -56,7 +56,7 @@ describe('ListServerService', () => {
       generateId: () => 'audit-2',
       now: () => new Date('2026-07-12T01:00:00.000Z'),
     })
-    await expect(service.execute({ actor: 'admin' })).rejects.toEqual(
+    expect(() => service.execute({ actor: 'admin' })).toThrow(
       new ApplicationError(
         ApiErrorCode.INTERNAL_ERROR,
         500,
@@ -72,7 +72,7 @@ describe('ListServerService', () => {
     )
   })
 
-  it('preserves application errors and original error when failure audit fails', async () => {
+  it('preserves application errors and original error when failure audit fails', () => {
     const error = new ApplicationError(ApiErrorCode.INTERNAL_ERROR, 500, 'safe')
     const service = new ListServerService({
       serverRepository: {
@@ -87,6 +87,6 @@ describe('ListServerService', () => {
         }),
       },
     })
-    await expect(service.execute({ actor: 'admin' })).rejects.toBe(error)
+    expect(() => service.execute({ actor: 'admin' })).toThrow(error)
   })
 })

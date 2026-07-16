@@ -23,7 +23,7 @@ export class ListServerService {
     this.#generateId = dependencies.generateId ?? randomUUID
     this.#now = dependencies.now ?? (() => new Date())
   }
-  async execute(context: ListServerContext): Promise<ServerDto[]> {
+  execute(context: ListServerContext): ServerDto[] {
     const source =
       context.sourceIp === undefined ? {} : { sourceIp: context.sourceIp }
     try {

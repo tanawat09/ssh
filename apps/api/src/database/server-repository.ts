@@ -127,7 +127,7 @@ export class ServerRepository {
   }
 
   listAll(): ServerDto[] {
-    const rows = this.#listAll.all() as Array<{
+    const rows = this.#listAll.all() as {
       id: string
       name: string
       host: string
@@ -138,7 +138,7 @@ export class ServerRepository {
       host_key_fingerprint: string
       created_at: string
       updated_at: string
-    }>
+    }[]
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
