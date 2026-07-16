@@ -79,4 +79,24 @@ test('creates password and private-key servers, rejects duplicates, and clears f
   await expect(page.getByRole('textbox', { name: 'Private key' })).toHaveValue(
     '',
   )
+
+  await page.goto('/servers')
+  await expect(page.getByRole('heading', { name: 'Servers' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Password fixture' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Private key fixture' }),
+  ).toBeVisible()
+  await expect(page.getByText(sshPassword, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(sshPrivateKey, { exact: true })).toHaveCount(0)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Servers' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Password fixture' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Private key fixture' }),
+  ).toBeVisible()
 })
