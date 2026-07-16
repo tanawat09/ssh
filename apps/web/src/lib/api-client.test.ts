@@ -50,10 +50,27 @@ describe('ApiClient', () => {
   })
 
   it('lists servers with a credentialed GET and no body', async () => {
+    const server = {
+      id: 'server-1',
+      name: 'Production',
+      host: 'server.example.com',
+      port: 22,
+      username: 'deploy',
+      authType: 'password' as const,
+      hostKeyAlgorithm: 'ssh-ed25519',
+      hostKeyFingerprint: 'SHA256:server',
+      createdAt: '2026-07-12T00:00:00.000Z',
+      updatedAt: '2026-07-12T00:00:00.000Z',
+    }
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }),
+      new Response(JSON.stringify([server]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
     )
-    await expect(new ApiClient(fetcher).listServers()).resolves.toEqual([])
+    await expect(new ApiClient(fetcher).listServers()).resolves.toEqual([
+      server,
+    ])
     expect(fetcher).toHaveBeenCalledWith('/api/v1/servers', {
       method: 'GET',
       credentials: 'include',
