@@ -6,6 +6,9 @@ import { apiClient, ApiClientError } from '../lib/api-client'
 
 interface LoginApi {
   login(request: LoginRequest): Promise<SessionDto>
+}
+
+interface SessionApi {
   session(): Promise<SessionDto>
 }
 
@@ -21,7 +24,7 @@ export const useSessionStore = defineStore('session', () => {
     user.value = session.user
   }
 
-  async function restore(api: LoginApi = apiClient): Promise<void> {
+  async function restore(api: SessionApi = apiClient): Promise<void> {
     try {
       user.value = (await api.session()).user
     } catch (error) {
