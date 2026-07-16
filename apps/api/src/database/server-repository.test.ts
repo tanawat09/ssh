@@ -129,14 +129,35 @@ describe('ServerRepository', () => {
       serverRecord({
         id: 'server-2',
         name: 'Staging',
-        createdAt: '2026-07-13T00:00:00.000Z',
-        updatedAt: '2026-07-13T00:00:00.000Z',
+        createdAt: '2026-07-12T00:00:00.000Z',
+        updatedAt: '2026-07-12T00:00:00.000Z',
         host: 'staging.example.com',
       }),
       encryptedCredential,
       successEvent({ id: 'audit-2', targetId: 'server-2' }),
     )
+    repository.createWithAudit(
+      serverRecord({
+        id: 'server-0',
+        name: 'Development',
+        host: 'dev.example.com',
+      }),
+      encryptedCredential,
+      successEvent({ id: 'audit-0', targetId: 'server-0' }),
+    )
     expect(repository.listAll()).toEqual([
+      {
+        id: 'server-0',
+        name: 'Development',
+        host: 'dev.example.com',
+        port: 22,
+        username: 'deploy',
+        authType: 'password',
+        hostKeyAlgorithm: 'ssh-ed25519',
+        hostKeyFingerprint: 'SHA256:server',
+        createdAt: '2026-07-12T00:00:00.000Z',
+        updatedAt: '2026-07-12T00:00:00.000Z',
+      },
       {
         id: 'server-1',
         name: 'Production',
@@ -158,8 +179,8 @@ describe('ServerRepository', () => {
         authType: 'password',
         hostKeyAlgorithm: 'ssh-ed25519',
         hostKeyFingerprint: 'SHA256:server',
-        createdAt: '2026-07-13T00:00:00.000Z',
-        updatedAt: '2026-07-13T00:00:00.000Z',
+        createdAt: '2026-07-12T00:00:00.000Z',
+        updatedAt: '2026-07-12T00:00:00.000Z',
       },
     ])
     const first = repository.listAll()[0]

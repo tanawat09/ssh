@@ -56,7 +56,7 @@ export class ServerRepository {
       SELECT id, name, host, port, username, auth_type,
         host_key_algorithm, host_key_fingerprint, created_at, updated_at
       FROM servers
-      ORDER BY created_at ASC
+      ORDER BY created_at ASC, id ASC
     `)
     this.#insertServer = database.prepare(`
       INSERT INTO servers (

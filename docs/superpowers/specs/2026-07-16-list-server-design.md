@@ -22,7 +22,7 @@ client or written to audit metadata.
 ## Persistence
 
 - Add `ServerRepository.listAll()` selecting only public server columns.
-- Order results by `created_at ASC` for deterministic display.
+- Order results by `created_at ASC, id ASC` for deterministic display.
 - Keep credentials and host-key bytes out of the query.
 - Add an `AuditRepository` helper for list events if it removes duplication
   without changing existing repository contracts.

@@ -24,13 +24,15 @@
 ### Task 1: Shared API client contract and repository query
 
 **Files:**
+
 - Modify: `apps/api/src/database/server-repository.ts`
 - Test: `apps/api/src/database/server-repository.test.ts`
 - Modify: `apps/web/src/lib/api-client.ts`
 - Test: `apps/web/src/lib/api-client.test.ts`
 
 **Interfaces:**
-- Produces `ServerRepository.listAll(): ServerDto[]`, ordered by `created_at ASC`, selecting only public columns.
+
+- Produces `ServerRepository.listAll(): ServerDto[]`, ordered by `created_at ASC, id ASC`, selecting only public columns.
 - Produces `ApiClient.listServers(): Promise<ServerDto[]>` using `GET /api/v1/servers` and credentials included.
 
 - [ ] **Step 1: Write failing repository tests**
@@ -43,7 +45,7 @@ Run `npm test -w @remote/api -- server-repository.test.ts` in the Node 22 test c
 
 - [ ] **Step 3: Implement the minimal public query**
 
-Prepare a statement selecting `id, name, host, port, username, auth_type, host_key_algorithm, host_key_fingerprint, created_at, updated_at` from `servers ORDER BY created_at ASC`, then map database column names to `ServerDto`.
+Prepare a statement selecting `id, name, host, port, username, auth_type, host_key_algorithm, host_key_fingerprint, created_at, updated_at` from `servers ORDER BY created_at ASC, id ASC`, then map database column names to `ServerDto`.
 
 - [ ] **Step 4: Verify repository tests pass**
 
@@ -67,6 +69,7 @@ git commit -m "feat: add public server listing query"
 ### Task 2: Audit service and protected list route
 
 **Files:**
+
 - Modify: `apps/api/src/database/audit-repository.ts`
 - Test: `apps/api/src/database/audit-repository.test.ts`
 - Create: `apps/api/src/servers/list-server-service.ts`
@@ -76,6 +79,7 @@ git commit -m "feat: add public server listing query"
 - Modify: `apps/api/src/app.ts`
 
 **Interfaces:**
+
 - Produces `ListServerService.execute(context: { actor: string; sourceIp?: string }): Promise<ServerDto[]>`.
 - Consumes `ServerRepository.listAll()` and an audit writer for success/failure events.
 - Produces `GET /api/v1/servers` with response `ServerDto[]`, protected by `requirePermission('servers:read')`.
@@ -114,12 +118,14 @@ git commit -m "feat: add audited list servers endpoint"
 ### Task 3: Authenticated Vue server list view and navigation
 
 **Files:**
+
 - Create: `apps/web/src/views/ServerListView.vue`
 - Test: `apps/web/src/views/ServerListView.test.ts`
 - Modify: `apps/web/src/router.ts`
 - Modify: `apps/web/src/views/CreateServerView.vue`
 
 **Interfaces:**
+
 - Consumes `apiClient.listServers()` through `session.runAuthenticated`.
 - Produces authenticated route `/servers` and navigation to `/servers/new`.
 
@@ -153,6 +159,7 @@ git commit -m "feat: add server list view"
 ### Task 4: Full verification and delivery gate
 
 **Files:**
+
 - Modify: `tests/e2e/create-server.spec.ts` only if the authenticated landing route changes require setup updates.
 - Modify: `tests/e2e/create-server.mobile.spec.ts` only if selectors or navigation require updates.
 

@@ -1,6 +1,6 @@
 # Web Remote Platform
 
-This repository delivers the first create-server workflow: one configured administrator can sign in, test an SSH endpoint with a password or private key, and persist the server only after authentication succeeds. The saved endpoint includes the captured host-key fingerprint. Server listing, deletion, interactive sessions, and all other remote protocols are outside this release.
+This release delivers the authenticated create-server and list-server workflows: one configured administrator can sign in, test an SSH endpoint with a password or private key, persist the server only after authentication succeeds, and view saved public server records. The saved endpoint includes the captured host-key fingerprint. Server deletion, interactive terminal sessions, and all other remote protocols remain outside this release.
 
 ## Prerequisites
 
