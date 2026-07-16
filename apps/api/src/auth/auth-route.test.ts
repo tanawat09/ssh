@@ -309,3 +309,34 @@ describe('POST /api/v1/auth/login', () => {
     }
   })
 })
+
+describe('GET /api/v1/auth/session', () => {
+  it('returns the authenticated session from the HttpOnly cookie', async () => {
+    const app = createApp()
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      headers: loginHeaders(),
+      payload: { username: 'admin', password },
+    })
+    const cookie = login.headers['set-cookie']
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/session',
+      headers: { cookie: Array.isArray(cookie) ? cookie[0] : cookie },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      user: { username: 'admin', role: 'admin' },
+    })
+  })
+
+  it('rejects requests without a valid session', async () => {
+    const app = createApp()
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/session',
+    })
+    expect(response.statusCode).toBe(401)
+  })
+})

@@ -25,4 +25,13 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => useSessionStore().routeFor(to.meta))
+let sessionRestored = false
+
+router.beforeEach(async (to) => {
+  const session = useSessionStore()
+  if (to.meta.requiresAuth === true && !sessionRestored) {
+    sessionRestored = true
+    await session.restore()
+  }
+  return session.routeFor(to.meta)
+})

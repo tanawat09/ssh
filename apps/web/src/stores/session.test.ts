@@ -22,6 +22,38 @@ describe('session store', () => {
     expect('token' in store.$state).toBe(false)
   })
 
+  it('restores the session from the HttpOnly cookie', async () => {
+    const api = {
+      login: vi.fn(),
+      session: vi
+        .fn()
+        .mockResolvedValue({ user: { username: 'admin', role: 'admin' } }),
+    }
+    const store = useSessionStore()
+
+    await store.restore(api)
+
+    expect(api.session).toHaveBeenCalledOnce()
+    expect(store.user).toEqual({ username: 'admin', role: 'admin' })
+    expect(store.isAuthenticated).toBe(true)
+  })
+
+  it('treats a rejected session cookie as signed out', async () => {
+    const api = {
+      login: vi.fn(),
+      session: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiClientError(401, 'UNAUTHENTICATED', 'Authentication required'),
+        ),
+    }
+    const store = useSessionStore()
+
+    await store.restore(api)
+
+    expect(store.user).toBeNull()
+  })
+
   it('clears the session after a protected request returns 401', async () => {
     const store = useSessionStore()
     store.user = { username: 'admin', role: 'admin' }

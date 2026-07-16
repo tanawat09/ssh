@@ -6,6 +6,7 @@ import { apiClient, ApiClientError } from '../lib/api-client'
 
 interface LoginApi {
   login(request: LoginRequest): Promise<SessionDto>
+  session(): Promise<SessionDto>
 }
 
 export const useSessionStore = defineStore('session', () => {
@@ -18,6 +19,16 @@ export const useSessionStore = defineStore('session', () => {
   ): Promise<void> {
     const session = await api.login(request)
     user.value = session.user
+  }
+
+  async function restore(api: LoginApi = apiClient): Promise<void> {
+    try {
+      user.value = (await api.session()).user
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 401)
+        user.value = null
+      else throw error
+    }
   }
 
   function clear(): void {
@@ -41,5 +52,13 @@ export const useSessionStore = defineStore('session', () => {
       : true
   }
 
-  return { user, isAuthenticated, login, clear, runAuthenticated, routeFor }
+  return {
+    user,
+    isAuthenticated,
+    login,
+    restore,
+    clear,
+    runAuthenticated,
+    routeFor,
+  }
 })

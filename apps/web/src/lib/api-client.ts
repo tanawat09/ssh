@@ -56,6 +56,10 @@ export class ApiClient {
     return this.request('/api/v1/auth/login', request)
   }
 
+  session(): Promise<SessionDto> {
+    return this.get('/api/v1/auth/session')
+  }
+
   createServer(request: CreateServerRequest): Promise<ServerDto> {
     return this.request('/api/v1/servers', request)
   }

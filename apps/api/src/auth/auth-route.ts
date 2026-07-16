@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify'
 import type { AppConfig } from '../config.js'
 import { ApplicationError } from '../domain/application-error.js'
 import { ApiErrorCode } from '@remote/shared'
+import { requirePermission } from '../security/permissions.js'
 
 interface AuthRouteOptions {
   config: AppConfig
@@ -77,5 +78,22 @@ export function registerAuthRoute(
         },
       }
     },
+  )
+
+  app.get(
+    '/api/v1/auth/session',
+    {
+      preHandler: requirePermission('servers:read'),
+      schema: {
+        response: {
+          200: SessionDtoSchema,
+          401: ApiErrorSchema,
+          403: ApiErrorSchema,
+        },
+      },
+    },
+    async (): Promise<SessionDto> => ({
+      user: { username: config.adminUsername, role: 'admin' },
+    }),
   )
 }
