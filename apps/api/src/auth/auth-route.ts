@@ -92,7 +92,7 @@ export function registerAuthRoute(
         },
       },
     },
-    async (): Promise<SessionDto> => ({
+    (): Promise<SessionDto> => ({
       user: { username: config.adminUsername, role: 'admin' },
     }),
   )
