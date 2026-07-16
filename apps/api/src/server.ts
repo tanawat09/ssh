@@ -5,6 +5,7 @@ import { migrateDatabase, openDatabase } from './database/database.js'
 import { ServerRepository } from './database/server-repository.js'
 import { CredentialCipher } from './security/credential-cipher.js'
 import { CreateServerService } from './servers/create-server-service.js'
+import { ListServerService } from './servers/list-server-service.js'
 import { Ssh2Gateway } from './servers/ssh-gateway.js'
 
 async function start(): Promise<void> {
@@ -20,14 +21,20 @@ async function start(): Promise<void> {
 
   try {
     migrateDatabase(database)
+    const serverRepository = new ServerRepository(database)
+    const auditRepository = new AuditRepository(database)
     const createServerService = new CreateServerService({
-      serverRepository: new ServerRepository(database),
-      auditRepository: new AuditRepository(database),
+      serverRepository,
+      auditRepository,
       sshGateway: new Ssh2Gateway(),
       credentialCipher: new CredentialCipher(config.credentialEncryptionKey),
       sshConnectTimeoutMs: config.sshConnectTimeoutMs,
     })
-    const app = buildApp({ config, createServerService })
+    const listServerService = new ListServerService({
+      serverRepository,
+      auditRepository,
+    })
+    const app = buildApp({ config, createServerService, listServerService })
     let shuttingDown = false
     const shutdown = async (): Promise<void> => {
       if (shuttingDown) {

@@ -14,6 +14,8 @@ export interface AuditEvent {
 }
 
 const metadataKeys = [
+  'resource',
+  'count',
   'errorCode',
   'host',
   'port',
@@ -45,6 +47,15 @@ function hasAllowedMetadataValue(
     )
   }
 
+  if (key === 'count') {
+    return (
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 100_000
+    )
+  }
+
   if (key === 'tofuAccepted') {
     return typeof value === 'boolean'
   }
@@ -61,6 +72,9 @@ function hasAllowedMetadataValue(
     return typeof value === 'string' && value.length >= 1 && value.length <= 512
   }
 
+  if (key === 'resource') {
+    return typeof value === 'string' && value.length >= 1 && value.length <= 128
+  }
   return typeof value === 'string'
 }
 
@@ -79,6 +93,7 @@ export function serializeAuditMetadata(
 
 export class AuditRepository {
   readonly #insertFailure: Database.Statement
+  readonly #insertSuccess: Database.Statement
 
   constructor(database: Database.Database) {
     this.#insertFailure = database.prepare(`
@@ -86,6 +101,10 @@ export class AuditRepository {
         id, action, result, actor, target_type, target_id, source_ip,
         metadata, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    this.#insertSuccess = database.prepare(`
+      INSERT INTO audit_logs (id, action, result, actor, target_type, target_id, source_ip, metadata, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
   }
 
@@ -95,6 +114,22 @@ export class AuditRepository {
     }
 
     this.#insertFailure.run(
+      event.id,
+      event.action,
+      event.result,
+      event.actor,
+      event.targetType,
+      event.targetId ?? null,
+      event.sourceIp ?? null,
+      serializeAuditMetadata(event.metadata),
+      event.createdAt,
+    )
+  }
+
+  recordSuccess(event: AuditEvent): void {
+    if (event.result !== 'success')
+      throw new Error('AuditRepository.recordSuccess requires a success event')
+    this.#insertSuccess.run(
       event.id,
       event.action,
       event.result,

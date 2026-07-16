@@ -14,11 +14,13 @@ import { ApplicationError } from './domain/application-error.js'
 import {
   registerServerRoute,
   type CreateServerExecutor,
+  type ListServerExecutor,
 } from './servers/server-route.js'
 
 export interface BuildAppOptions {
   config: AppConfig
   createServerService?: CreateServerExecutor
+  listServerService?: ListServerExecutor
 }
 
 const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -115,6 +117,7 @@ function sendError(error: unknown, reply: FastifyReply) {
 export function buildApp({
   config,
   createServerService,
+  listServerService,
 }: BuildAppOptions): FastifyInstance {
   const app = Fastify({
     trustProxy: config.nodeEnv === 'production' ? 1 : false,
@@ -182,8 +185,8 @@ export function buildApp({
   )
   app.register((instance, _options, done) => {
     registerAuthRoute(instance, { config })
-    if (createServerService !== undefined) {
-      registerServerRoute(instance, createServerService)
+    if (createServerService !== undefined || listServerService !== undefined) {
+      registerServerRoute(instance, createServerService, listServerService)
     }
     done()
   })
