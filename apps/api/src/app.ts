@@ -25,6 +25,14 @@ export interface BuildAppOptions {
 
 const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const maxRateLimitKeys = 5_000
+const trustedProxyCidrs = [
+  '127.0.0.0/8',
+  '::1/128',
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  'fc00::/7',
+]
 
 class RollingWindowStore {
   private readonly attemptsByKey = new Map<string, number[]>()
@@ -120,7 +128,7 @@ export function buildApp({
   listServerService,
 }: BuildAppOptions): FastifyInstance {
   const app = Fastify({
-    trustProxy: config.nodeEnv === 'production' ? 1 : false,
+    trustProxy: config.nodeEnv === 'production' ? trustedProxyCidrs : false,
     logger:
       config.nodeEnv === 'production'
         ? {

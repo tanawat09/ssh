@@ -121,7 +121,7 @@ describe('POST /api/v1/servers', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('uses the immediate client reported by nginx instead of a forged leftmost forwarded IP', async () => {
+  it('uses the client reported by nginx through a private proxy', async () => {
     const { app, execute, token } = await setupWithConfig({
       ...config,
       nodeEnv: 'production',
@@ -138,7 +138,28 @@ describe('POST /api/v1/servers', () => {
     expect(response.statusCode).toBe(201)
     expect(execute).toHaveBeenCalledWith(passwordRequest, {
       actor: 'admin',
-      sourceIp: '10.0.0.8',
+      sourceIp: '198.51.100.42',
+    })
+  })
+
+  it('does not trust forwarded addresses from a public peer', async () => {
+    const { app, execute, token } = await setupWithConfig({
+      ...config,
+      nodeEnv: 'production',
+    })
+    const response = await app.inject({
+      ...request(token),
+      remoteAddress: '198.51.100.42',
+      headers: {
+        ...request(token).headers,
+        'x-forwarded-for': '10.0.0.8',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(execute).toHaveBeenCalledWith(passwordRequest, {
+      actor: 'admin',
+      sourceIp: '198.51.100.42',
     })
   })
 

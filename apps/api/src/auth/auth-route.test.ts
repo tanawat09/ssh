@@ -196,7 +196,7 @@ describe('POST /api/v1/auth/login', () => {
     expect((await app.inject(requestFor('203.0.113.20'))).statusCode).toBe(401)
   })
 
-  it('does not let a private client spoof login budgets with a forged leftmost forwarded IP', async () => {
+  it('uses the client address from a private proxy forwarding chain', async () => {
     const app = createApp(createConfig({ nodeEnv: 'production' }))
     const requestFor = (forgedIp: string) => ({
       method: 'POST' as const,
@@ -216,7 +216,7 @@ describe('POST /api/v1/auth/login', () => {
       ).toBe(401)
     }
 
-    expect((await app.inject(requestFor('203.0.113.99'))).statusCode).toBe(429)
+    expect((await app.inject(requestFor('203.0.113.99'))).statusCode).toBe(401)
   })
 
   it('keeps attempts made near the end of a rolling window', async () => {
