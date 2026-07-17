@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:shared && npm run build -w @remote/api && npm run build -w @remote/web",
+    "build:shared": "npm run build -w @remote/shared",
     "dev": "npm run build && concurrently --kill-others-on-fail --names api,web \"node apps/api/dist/server.js\" \"npm run dev -w @remote/web\"",
     "format:check": "prettier --check .",
+    "prelint": "npm run build:shared",
     "lint": "eslint .",
+    "pretest": "npm run build:shared",
     "test": "npm test --workspaces --if-present",
     "test:e2e": "npm run build && playwright test",
+    "pretypecheck": "npm run build:shared",
     "typecheck": "npm run typecheck --workspaces --if-present && node node_modules/typescript/bin/tsc -p tests/e2e/tsconfig.json --noEmit"
   },
   "keywords": [],
