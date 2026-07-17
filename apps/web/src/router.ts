@@ -22,6 +22,12 @@ export const router = createRouter({
       component: CreateServerView,
       meta: { requiresAuth: true },
     },
+    {
+      path: '/terminals',
+      name: 'terminals',
+      component: () => import('./views/TerminalWorkspaceView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

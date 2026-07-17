@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ServerDto } from '@remote/shared'
 import { onMounted, ref } from 'vue'
+import { SquareTerminal } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 import { apiClient, ApiClientError } from '../lib/api-client'
@@ -65,9 +66,19 @@ onMounted(loadServers)
       </p>
       <div v-else class="server-rows">
         <article v-for="server in servers" :key="server.id" class="server-row">
-          <div>
+          <div class="server-identity">
             <h2>{{ server.name }}</h2>
             <p>{{ server.username }}@{{ server.host }}:{{ server.port }}</p>
+            <RouterLink
+              class="secondary-button connect-button"
+              :to="{
+                name: 'terminals',
+                query: { server: server.id },
+              }"
+            >
+              <SquareTerminal :size="16" aria-hidden="true" />
+              Connect
+            </RouterLink>
           </div>
           <dl>
             <div>
