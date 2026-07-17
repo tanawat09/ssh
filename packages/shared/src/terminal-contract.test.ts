@@ -37,8 +37,9 @@ describe('parseTerminalClientMessage', () => {
 
   it('enforces the input limit in UTF-8 bytes', () => {
     const ascii = 'a'.repeat(TERMINAL_INPUT_MAX_BYTES)
+    const thaiCharacterBytes = new TextEncoder().encode('ก').byteLength
     const multiByteAtLimit = 'ก'.repeat(
-      Math.floor(TERMINAL_INPUT_MAX_BYTES / Buffer.byteLength('ก')),
+      Math.floor(TERMINAL_INPUT_MAX_BYTES / thaiCharacterBytes),
     )
 
     expect(
