@@ -1,6 +1,7 @@
 import cookie from '@fastify/cookie'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
+import websocket from '@fastify/websocket'
 import { ApiErrorCode } from '@remote/shared'
 import Fastify, {
   type FastifyError,
@@ -16,11 +17,16 @@ import {
   type CreateServerExecutor,
   type ListServerExecutor,
 } from './servers/server-route.js'
+import {
+  registerTerminalRoute,
+  type TerminalRouteDependencies,
+} from './terminal/terminal-route.js'
 
 export interface BuildAppOptions {
   config: AppConfig
   createServerService?: CreateServerExecutor
   listServerService?: ListServerExecutor
+  terminalRouteDependencies?: TerminalRouteDependencies
 }
 
 const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -126,6 +132,7 @@ export function buildApp({
   config,
   createServerService,
   listServerService,
+  terminalRouteDependencies,
 }: BuildAppOptions): FastifyInstance {
   const app = Fastify({
     trustProxy: config.nodeEnv === 'production' ? trustedProxyCidrs : false,
@@ -142,6 +149,9 @@ export function buildApp({
         : false,
   })
 
+  app.register(websocket, {
+    options: { maxPayload: 65_536, perMessageDeflate: false },
+  })
   app.register(cookie)
   app.register(jwt, {
     secret: config.jwtSecret,
@@ -195,6 +205,9 @@ export function buildApp({
     registerAuthRoute(instance, { config })
     if (createServerService !== undefined || listServerService !== undefined) {
       registerServerRoute(instance, createServerService, listServerService)
+    }
+    if (terminalRouteDependencies !== undefined) {
+      registerTerminalRoute(instance, terminalRouteDependencies)
     }
     done()
   })
