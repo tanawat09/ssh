@@ -17,6 +17,16 @@ export interface ServerRecord extends ServerDto {
   hostKeyBase64: string
 }
 
+export interface ServerConnectionMaterial {
+  id: string
+  host: string
+  port: number
+  username: string
+  authType: ServerDto['authType']
+  hostKeyBase64: string
+  encryptedCredential: EncryptedCredential
+}
+
 function isEndpointUniqueConstraint(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) {
     return false
@@ -36,6 +46,7 @@ function isEndpointUniqueConstraint(error: unknown): boolean {
 export class ServerRepository {
   readonly #existsByEndpoint: Database.Statement
   readonly #listAll: Database.Statement
+  readonly #getConnectionMaterialById: Database.Statement
   readonly #insertServer: Database.Statement
   readonly #insertCredential: Database.Statement
   readonly #insertSuccessAudit: Database.Statement
@@ -57,6 +68,14 @@ export class ServerRepository {
         host_key_algorithm, host_key_fingerprint, created_at, updated_at
       FROM servers
       ORDER BY created_at ASC, id ASC
+    `)
+    this.#getConnectionMaterialById = database.prepare(`
+      SELECT s.id, s.host, s.port, s.username, s.auth_type,
+        s.host_key_base64, c.encrypted_payload, c.iv, c.auth_tag
+      FROM servers s
+      INNER JOIN server_credentials c ON c.server_id = s.id
+      WHERE s.id = ?
+      LIMIT 1
     `)
     this.#insertServer = database.prepare(`
       INSERT INTO servers (
@@ -151,6 +170,41 @@ export class ServerRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }))
+  }
+
+  getConnectionMaterialById(
+    id: string,
+  ): ServerConnectionMaterial | undefined {
+    const row = this.#getConnectionMaterialById.get(id) as
+      | {
+          id: string
+          host: string
+          port: number
+          username: string
+          auth_type: ServerDto['authType']
+          host_key_base64: string
+          encrypted_payload: Buffer
+          iv: Buffer
+          auth_tag: Buffer
+        }
+      | undefined
+    if (row === undefined) {
+      return undefined
+    }
+
+    return {
+      id: row.id,
+      host: row.host,
+      port: row.port,
+      username: row.username,
+      authType: row.auth_type,
+      hostKeyBase64: row.host_key_base64,
+      encryptedCredential: {
+        encryptedPayload: row.encrypted_payload.toString('base64'),
+        iv: row.iv.toString('base64'),
+        authTag: row.auth_tag.toString('base64'),
+      },
+    }
   }
 
   createWithAudit(

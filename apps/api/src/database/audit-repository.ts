@@ -23,6 +23,8 @@ const metadataKeys = [
   'authType',
   'tofuAccepted',
   'hostKeyFingerprint',
+  'reason',
+  'durationMs',
 ] as const
 
 type AllowedMetadataKey = (typeof metadataKeys)[number]
@@ -56,6 +58,15 @@ function hasAllowedMetadataValue(
     )
   }
 
+  if (key === 'durationMs') {
+    return (
+      typeof value === 'number' &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 86_400_000
+    )
+  }
+
   if (key === 'tofuAccepted') {
     return typeof value === 'boolean'
   }
@@ -74,6 +85,9 @@ function hasAllowedMetadataValue(
 
   if (key === 'resource') {
     return typeof value === 'string' && value.length >= 1 && value.length <= 128
+  }
+  if (key === 'reason') {
+    return value === 'client' || value === 'ssh' || value === 'error'
   }
   return typeof value === 'string'
 }

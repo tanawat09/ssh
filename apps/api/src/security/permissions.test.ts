@@ -105,6 +105,30 @@ describe('requirePermission', () => {
     expect(response.statusCode).toBe(200)
   })
 
+  it('allows an admin JWT to use servers:connect', async () => {
+    const app = Fastify()
+    apps.push(app)
+    void app.register(cookie)
+    void app.register(jwt, {
+      secret: 'a-secure-test-jwt-secret-with-32-bytes',
+      cookie: { cookieName: 'remote_session', signed: false },
+      sign: { algorithm: 'HS256', expiresIn: 3600 },
+    })
+    app.get(
+      '/protected-connect',
+      { preHandler: requirePermission('servers:connect') },
+      () => ({ ok: true }),
+    )
+    await app.ready()
+    const token = app.jwt.sign({ sub: 'admin', role: 'admin' })
+    const response = await app.inject({
+      method: 'GET',
+      url: '/protected-connect',
+      headers: { cookie: `remote_session=${token}` },
+    })
+    expect(response.statusCode).toBe(200)
+  })
+
   it('rejects a valid JWT whose role has no mapped permission', async () => {
     const app = createApp()
     await app.ready()

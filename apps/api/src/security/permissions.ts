@@ -4,10 +4,17 @@ import type { preHandlerAsyncHookHandler } from 'fastify'
 import { ApplicationError } from '../domain/application-error.js'
 
 export type Role = 'admin'
-export type Permission = 'servers:create' | 'servers:read'
+export type Permission =
+  | 'servers:create'
+  | 'servers:read'
+  | 'servers:connect'
 
 const permissionsByRole = {
-  admin: new Set<Permission>(['servers:create', 'servers:read']),
+  admin: new Set<Permission>([
+    'servers:create',
+    'servers:read',
+    'servers:connect',
+  ]),
 } satisfies Record<Role, ReadonlySet<Permission>>
 
 interface JwtPayload {

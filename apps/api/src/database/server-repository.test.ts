@@ -190,6 +190,27 @@ describe('ServerRepository', () => {
     expect(first).not.toHaveProperty('authTag')
   })
 
+  it('loads encrypted connection material only for a known server id', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+    repository.createWithAudit(
+      serverRecord(),
+      encryptedCredential,
+      successEvent(),
+    )
+
+    expect(repository.getConnectionMaterialById('server-1')).toEqual({
+      id: 'server-1',
+      host: 'server.example.com',
+      port: 22,
+      username: 'deploy',
+      authType: 'password',
+      hostKeyBase64: 'c2VydmVyLWtleQ==',
+      encryptedCredential,
+    })
+    expect(repository.getConnectionMaterialById('missing')).toBeUndefined()
+  })
+
   it('persists a server, encrypted credential, and success audit event together', () => {
     const database = createDatabase()
     const repository = new ServerRepository(database)

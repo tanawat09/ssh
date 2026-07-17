@@ -124,4 +124,43 @@ describe('AuditRepository', () => {
     expect(JSON.parse(audit.metadata)).toEqual({})
     expect(audit.metadata).not.toContain('private key rejected')
   })
+
+  it('retains only bounded terminal disconnect metadata', () => {
+    const database = createDatabase()
+    const repository = new AuditRepository(database)
+    repository.recordSuccess({
+      id: 'audit-terminal-1',
+      action: 'terminal.disconnect',
+      result: 'success',
+      actor: 'admin',
+      targetType: 'server',
+      targetId: 'server-1',
+      metadata: {
+        reason: 'client',
+        durationMs: 12_345,
+        input: 'cat /etc/shadow',
+        output: 'secret output',
+      },
+      createdAt: '2026-07-17T00:00:00.000Z',
+    })
+    repository.recordSuccess({
+      id: 'audit-terminal-2',
+      action: 'terminal.disconnect',
+      result: 'success',
+      actor: 'admin',
+      targetType: 'server',
+      targetId: 'server-1',
+      metadata: { reason: 'unknown', durationMs: 86_400_001 },
+      createdAt: '2026-07-17T00:00:01.000Z',
+    })
+
+    const rows = database
+      .prepare('SELECT metadata FROM audit_logs ORDER BY id')
+      .all() as { metadata: string }[]
+    expect(JSON.parse(rows[0]?.metadata ?? '{}')).toEqual({
+      reason: 'client',
+      durationMs: 12_345,
+    })
+    expect(JSON.parse(rows[1]?.metadata ?? '{}')).toEqual({})
+  })
 })
