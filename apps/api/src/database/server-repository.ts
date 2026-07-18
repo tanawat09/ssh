@@ -172,9 +172,7 @@ export class ServerRepository {
     }))
   }
 
-  getConnectionMaterialById(
-    id: string,
-  ): ServerConnectionMaterial | undefined {
+  getConnectionMaterialById(id: string): ServerConnectionMaterial | undefined {
     const row = this.#getConnectionMaterialById.get(id) as
       | {
           id: string

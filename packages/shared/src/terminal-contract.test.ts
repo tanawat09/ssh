@@ -75,6 +75,8 @@ describe('serializeTerminalServerMessage', () => {
     },
     { type: 'closed' as const, reason: 'client' as const },
   ])('serializes the approved %s control message', (message) => {
-    expect(serializeTerminalServerMessage(message)).toBe(JSON.stringify(message))
+    expect(serializeTerminalServerMessage(message)).toBe(
+      JSON.stringify(message),
+    )
   })
 })

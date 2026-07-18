@@ -27,17 +27,23 @@ class FakeWebSocket {
   }
 
   emit(type: string, event: Event): void {
-    this.listeners.get(type)?.forEach((listener) => listener(event))
+    this.listeners.get(type)?.forEach((listener) => {
+      listener(event)
+    })
   }
 }
 
 function setup() {
   let socket: FakeWebSocket | undefined
+  const onReady = vi.fn<(sessionId: string) => void>()
+  const onOutput = vi.fn<(data: Uint8Array) => void>()
+  const onError = vi.fn<TerminalSocketHandlers['onError']>()
+  const onClosed = vi.fn<TerminalSocketHandlers['onClosed']>()
   const handlers: TerminalSocketHandlers = {
-    onReady: vi.fn(),
-    onOutput: vi.fn(),
-    onError: vi.fn(),
-    onClosed: vi.fn(),
+    onReady,
+    onOutput,
+    onError,
+    onClosed,
   }
   const terminalSocket = createTerminalSocket('server/id', handlers, {
     location: { protocol: 'https:', host: 'ssh.example.com' },
@@ -47,7 +53,11 @@ function setup() {
     },
   })
   if (socket === undefined) throw new Error('WebSocket was not created')
-  return { socket, handlers, terminalSocket }
+  return { socket, terminalSocket, onReady, onOutput, onError, onClosed }
+}
+
+function parseSentMessage(value: string): unknown {
+  return JSON.parse(value) as unknown
 }
 
 describe('createTerminalSocket', () => {
@@ -62,7 +72,7 @@ describe('createTerminalSocket', () => {
   })
 
   it('forwards approved control messages and binary terminal output', () => {
-    const { socket, handlers } = setup()
+    const { socket, onReady, onOutput, onClosed } = setup()
 
     socket.emit(
       'message',
@@ -79,9 +89,9 @@ describe('createTerminalSocket', () => {
       }),
     )
 
-    expect(handlers.onReady).toHaveBeenCalledWith('session-1')
-    expect(handlers.onOutput).toHaveBeenCalledWith(bytes)
-    expect(handlers.onClosed).toHaveBeenCalledWith('ssh')
+    expect(onReady).toHaveBeenCalledWith('session-1')
+    expect(onOutput).toHaveBeenCalledWith(bytes)
+    expect(onClosed).toHaveBeenCalledWith('ssh')
   })
 
   it('sends validated control shapes and closes explicitly', () => {
@@ -91,7 +101,7 @@ describe('createTerminalSocket', () => {
     terminalSocket.resize(120, 40)
     terminalSocket.disconnect()
 
-    expect(socket.sent.map((value) => JSON.parse(value))).toEqual([
+    expect(socket.sent.map(parseSentMessage)).toEqual([
       { type: 'input', data: 'whoami\r' },
       { type: 'resize', cols: 120, rows: 40 },
       { type: 'disconnect' },
@@ -99,12 +109,26 @@ describe('createTerminalSocket', () => {
     expect(socket.close).toHaveBeenCalledTimes(1)
   })
 
+  it('flushes bounded input queued while the WebSocket is connecting', () => {
+    const { socket, terminalSocket } = setup()
+    socket.readyState = 0
+
+    terminalSocket.sendInput('whoami\r')
+    expect(socket.sent).toEqual([])
+
+    socket.readyState = 1
+    socket.emit('open', new Event('open'))
+    expect(socket.sent.map(parseSentMessage)).toEqual([
+      { type: 'input', data: 'whoami\r' },
+    ])
+  })
+
   it('maps malformed server control data to a protocol error', () => {
-    const { socket, handlers } = setup()
+    const { socket, onError } = setup()
 
     socket.emit('message', new MessageEvent('message', { data: '{invalid' }))
 
-    expect(handlers.onError).toHaveBeenCalledWith(
+    expect(onError).toHaveBeenCalledWith(
       'TERMINAL_PROTOCOL_ERROR',
       'Invalid terminal response',
     )

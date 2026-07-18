@@ -49,11 +49,15 @@ class FakeTerminal implements SshTerminal {
   }
 
   emitData(data: Buffer): void {
-    this.#dataListeners.forEach((listener) => listener(data))
+    this.#dataListeners.forEach((listener) => {
+      listener(data)
+    })
   }
 
   emitClose(): void {
-    this.#closeListeners.forEach((listener) => listener())
+    this.#closeListeners.forEach((listener) => {
+      listener()
+    })
   }
 }
 
@@ -66,7 +70,9 @@ const applications: FastifyInstance[] = []
 const sockets: WebSocket[] = []
 
 afterEach(async () => {
-  sockets.splice(0).forEach((socket) => socket.terminate())
+  sockets.splice(0).forEach((socket) => {
+    socket.terminate()
+  })
   await Promise.all(applications.splice(0).map((app) => app.close()))
 })
 
@@ -133,8 +139,20 @@ function nextMessage(
   socket: WebSocket,
 ): Promise<{ data: RawData; isBinary: boolean }> {
   return new Promise((resolve) => {
-    socket.once('message', (data, isBinary) => resolve({ data, isBinary }))
+    socket.once('message', (data, isBinary) => {
+      resolve({ data, isBinary })
+    })
   })
+}
+
+function rawDataToBuffer(data: RawData): Buffer {
+  if (Array.isArray(data)) return Buffer.concat(data)
+  if (data instanceof ArrayBuffer) return Buffer.from(new Uint8Array(data))
+  return Buffer.from(data)
+}
+
+function parseRawJson(data: RawData): unknown {
+  return JSON.parse(rawDataToBuffer(data).toString('utf8')) as unknown
 }
 
 describe('terminal websocket route', () => {
@@ -163,10 +181,15 @@ describe('terminal websocket route', () => {
     const readyMessage = nextMessage(socket)
     context.resolveOpen()
 
-    expect(JSON.parse((await readyMessage).data.toString())).toEqual({
-      type: 'ready',
-      sessionId: expect.any(String),
-    })
+    const ready = parseRawJson((await readyMessage).data)
+    expect(
+      typeof ready === 'object' &&
+        ready !== null &&
+        'type' in ready &&
+        ready.type === 'ready' &&
+        'sessionId' in ready &&
+        typeof ready.sessionId === 'string',
+    ).toBe(true)
     expect(context.getConnectionMaterialById).toHaveBeenCalledWith('server-1')
     expect(context.decrypt).toHaveBeenCalledWith(material.encryptedCredential)
     expect(context.openTerminal).toHaveBeenCalledWith({
@@ -179,7 +202,9 @@ describe('terminal websocket route', () => {
     context.terminal.emitData(Buffer.from('terminal output'))
     const output = await outputMessage
     expect(output.isBinary).toBe(true)
-    expect(output.data.toString()).toBe('terminal output')
+    expect(rawDataToBuffer(output.data).toString('utf8')).toBe(
+      'terminal output',
+    )
 
     socket.send(JSON.stringify({ type: 'input', data: 'whoami\r' }))
     socket.send(JSON.stringify({ type: 'resize', cols: 120, rows: 40 }))
@@ -210,11 +235,13 @@ describe('terminal websocket route', () => {
 
     socket.send(JSON.stringify({ type: 'disconnect' }))
 
-    expect(JSON.parse((await closedMessage).data.toString())).toEqual({
+    expect(parseRawJson((await closedMessage).data)).toEqual({
       type: 'closed',
       reason: 'client',
     })
-    await vi.waitFor(() => expect(context.terminal.close).toHaveBeenCalled())
+    await vi.waitFor(() => {
+      expect(context.terminal.close).toHaveBeenCalled()
+    })
     expect(context.recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'terminal.disconnect',
@@ -230,9 +257,7 @@ describe('terminal websocket route', () => {
       { headers: missing.headers },
     )
     sockets.push(missingSocket)
-    expect(
-      JSON.parse((await nextMessage(missingSocket)).data.toString()),
-    ).toEqual({
+    expect(parseRawJson((await nextMessage(missingSocket)).data)).toEqual({
       type: 'error',
       code: 'SERVER_NOT_FOUND',
       message: 'Server not found',
@@ -257,9 +282,7 @@ describe('terminal websocket route', () => {
     invalid.recordSuccess.mockClear()
     invalid.recordFailure.mockClear()
     invalidSocket.send('{invalid')
-    expect(
-      JSON.parse((await nextMessage(invalidSocket)).data.toString()),
-    ).toEqual({
+    expect(parseRawJson((await nextMessage(invalidSocket)).data)).toEqual({
       type: 'error',
       code: 'TERMINAL_PROTOCOL_ERROR',
       message: 'Invalid terminal message',

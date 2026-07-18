@@ -75,9 +75,16 @@ describe('application health', () => {
     )
 
     const message = await new Promise<RawData>((resolve) => {
-      socket.once('message', (data) => resolve(data))
+      socket.once('message', (data) => {
+        resolve(data)
+      })
     })
-    expect(JSON.parse(message.toString())).toEqual({
+    const messageBuffer = Array.isArray(message)
+      ? Buffer.concat(message)
+      : message instanceof ArrayBuffer
+        ? Buffer.from(new Uint8Array(message))
+        : Buffer.from(message)
+    expect(JSON.parse(messageBuffer.toString('utf8')) as unknown).toEqual({
       type: 'error',
       code: 'SERVER_NOT_FOUND',
       message: 'Server not found',

@@ -17,7 +17,8 @@ export class TerminalSessionManager {
   readonly #sessionsByActor = new Map<string, Map<string, string>>()
 
   reserve(actor: string, serverId: string): TerminalReservation {
-    const sessions = this.#sessionsByActor.get(actor) ?? new Map()
+    const sessions =
+      this.#sessionsByActor.get(actor) ?? new Map<string, string>()
     if (sessions.has(serverId)) {
       throw new ApplicationError(
         ApiErrorCode.TERMINAL_ALREADY_ACTIVE,

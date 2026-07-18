@@ -1,7 +1,7 @@
 import type { ServerDto } from '@remote/shared'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import type {
   TerminalSocket,
@@ -44,17 +44,18 @@ describe('TerminalWorkspaceView', () => {
     ]
     const store = useTerminalSessionsStore()
     const handlers = new Map<string, TerminalSocketHandlers>()
-    const sockets = new Map<string, TerminalSocket>()
+    const disconnects = new Map<string, Mock<() => void>>()
     const connectServer = (value: ServerDto): boolean =>
       store.connect(value, (serverId, socketHandlers) => {
         handlers.set(serverId, socketHandlers)
+        const disconnect = vi.fn<() => void>()
         const socket: TerminalSocket = {
           sendInput: vi.fn(),
           resize: vi.fn(),
-          disconnect: vi.fn(),
+          disconnect,
           close: vi.fn(),
         }
-        sockets.set(serverId, socket)
+        disconnects.set(serverId, disconnect)
         return socket
       })
     const wrapper = mount(TerminalWorkspaceView, {
@@ -93,7 +94,7 @@ describe('TerminalWorkspaceView', () => {
     await wrapper
       .find('[data-test="close-terminal-production"]')
       .trigger('click')
-    expect(sockets.get('production')?.disconnect).toHaveBeenCalledTimes(1)
+    expect(disconnects.get('production')).toHaveBeenCalledTimes(1)
     expect(wrapper.findAll('[data-test="terminal-tab"]')).toHaveLength(1)
     expect(store.activeServerId).toBe('database')
   })

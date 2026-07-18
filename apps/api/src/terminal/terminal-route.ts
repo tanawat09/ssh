@@ -7,7 +7,7 @@ import {
   type TerminalServerMessage,
 } from '@remote/shared'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
-import { WebSocket } from 'ws'
+import { WebSocket, type RawData } from 'ws'
 
 import type { AuditRepository } from '../database/audit-repository.js'
 import type { ServerRepository } from '../database/server-repository.js'
@@ -60,6 +60,14 @@ function actorFrom(request: FastifyRequest): string {
   return 'admin'
 }
 
+function rawDataToString(raw: RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8')
+  if (raw instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(raw)).toString('utf8')
+  }
+  return Buffer.from(raw).toString('utf8')
+}
+
 export function registerTerminalRoute(
   app: FastifyInstance,
   dependencies: TerminalRouteDependencies,
@@ -82,14 +90,18 @@ export function registerTerminalRoute(
         },
       },
       preHandler: [
-        async (request) => {
+        (request, _reply, done) => {
           if (request.headers.origin !== dependencies.allowedOrigin) {
-            throw new ApplicationError(
-              ApiErrorCode.FORBIDDEN,
-              403,
-              'Origin is not allowed',
+            done(
+              new ApplicationError(
+                ApiErrorCode.FORBIDDEN,
+                403,
+                'Origin is not allowed',
+              ),
             )
+            return
           }
+          done()
         },
         requirePermission('servers:connect'),
       ],
@@ -177,38 +189,7 @@ export function registerTerminalRoute(
         cleanup('error', false)
       }
 
-      let setupPromise: Promise<SshTerminal | undefined>
-      socket.on('message', async (raw, isBinary) => {
-        const message = isBinary
-          ? undefined
-          : parseTerminalClientMessage(raw.toString())
-        if (message === undefined) {
-          fail(
-            new ApplicationError(
-              ApiErrorCode.TERMINAL_PROTOCOL_ERROR,
-              400,
-              'Invalid terminal message',
-            ),
-          )
-          return
-        }
-        if (message.type === 'disconnect') {
-          cleanup('client', true)
-          return
-        }
-
-        const activeTerminal = await setupPromise
-        if (finished || activeTerminal === undefined) return
-        if (message.type === 'input') {
-          activeTerminal.write(message.data)
-        } else {
-          activeTerminal.resize(message.cols, message.rows)
-        }
-      })
-      socket.once('close', () => cleanup('client', false))
-      socket.once('error', () => cleanup('error', false))
-
-      setupPromise = new Promise((resolve) => {
+      const setupPromise = new Promise<SshTerminal | undefined>((resolve) => {
         setImmediate(() => {
           void (async () => {
             try {
@@ -244,7 +225,7 @@ export function registerTerminalRoute(
               terminal.onData((data) => {
                 if (finished || socket.readyState !== WebSocket.OPEN) return
                 socket.send(data, { binary: true }, (error) => {
-                  if (error !== undefined) cleanup('error', false)
+                  if (error != null) cleanup('error', false)
                 })
                 if (
                   socket.bufferedAmount > highWaterMark &&
@@ -267,7 +248,9 @@ export function registerTerminalRoute(
                   }, drainPollMs)
                 }
               })
-              terminal.onClose(() => cleanup('ssh', true))
+              terminal.onClose(() => {
+                cleanup('ssh', true)
+              })
               const connectedTime = now()
               dependencies.auditRepository.recordSuccess({
                 id: generateId(),
@@ -289,6 +272,41 @@ export function registerTerminalRoute(
             }
           })()
         })
+      })
+
+      socket.on('message', (raw, isBinary) => {
+        const message = isBinary
+          ? undefined
+          : parseTerminalClientMessage(rawDataToString(raw))
+        if (message === undefined) {
+          fail(
+            new ApplicationError(
+              ApiErrorCode.TERMINAL_PROTOCOL_ERROR,
+              400,
+              'Invalid terminal message',
+            ),
+          )
+          return
+        }
+        if (message.type === 'disconnect') {
+          cleanup('client', true)
+          return
+        }
+
+        void setupPromise.then((activeTerminal) => {
+          if (finished || activeTerminal === undefined) return
+          if (message.type === 'input') {
+            activeTerminal.write(message.data)
+          } else {
+            activeTerminal.resize(message.cols, message.rows)
+          }
+        })
+      })
+      socket.once('close', () => {
+        cleanup('client', false)
+      })
+      socket.once('error', () => {
+        cleanup('error', false)
       })
     },
   )

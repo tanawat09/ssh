@@ -68,8 +68,12 @@ describe('TerminalPane', () => {
     vi.stubGlobal(
       'ResizeObserver',
       class {
-        observe(): void {}
-        disconnect(): void {}
+        observe(): void {
+          // Layout is controlled by the test.
+        }
+        disconnect(): void {
+          // No observer resources are allocated by this test double.
+        }
       },
     )
   })
@@ -82,9 +86,11 @@ describe('TerminalPane', () => {
   it('forwards terminal output, input, and fitted dimensions', async () => {
     const store = useTerminalSessionsStore()
     let handlers: TerminalSocketHandlers | undefined
+    const sendInput = vi.fn<(data: string) => void>()
+    const resize = vi.fn<(cols: number, rows: number) => void>()
     const socket: TerminalSocket = {
-      sendInput: vi.fn(),
-      resize: vi.fn(),
+      sendInput,
+      resize,
       disconnect: vi.fn(),
       close: vi.fn(),
     }
@@ -102,8 +108,8 @@ describe('TerminalPane', () => {
 
     expect(terminalMocks.open).toHaveBeenCalledTimes(1)
     expect(terminalMocks.write).toHaveBeenCalledWith(new Uint8Array([104, 105]))
-    expect(socket.sendInput).toHaveBeenCalledWith('whoami\r')
-    expect(socket.resize).toHaveBeenCalledWith(120, 40)
+    expect(sendInput).toHaveBeenCalledWith('whoami\r')
+    expect(resize).toHaveBeenCalledWith(120, 40)
 
     wrapper.unmount()
     expect(terminalMocks.dispose).toHaveBeenCalledTimes(1)

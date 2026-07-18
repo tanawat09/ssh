@@ -1,6 +1,6 @@
 import type { ServerDto } from '@remote/shared'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import type {
   TerminalSocket,
@@ -21,21 +21,24 @@ const server = (index: number): ServerDto => ({
   updatedAt: '2026-07-17T00:00:00.000Z',
 })
 
-interface FakeConnection extends TerminalSocket {
+interface FakeConnection {
   handlers: TerminalSocketHandlers
+  disconnect: Mock<() => void>
+  close: Mock<() => void>
 }
 
 function socketFactory(connections: FakeConnection[]) {
   return (_serverId: string, handlers: TerminalSocketHandlers) => {
-    const connection: FakeConnection = {
-      handlers,
+    const disconnect = vi.fn<() => void>()
+    const close = vi.fn<() => void>()
+    const socket: TerminalSocket = {
       sendInput: vi.fn(),
       resize: vi.fn(),
-      disconnect: vi.fn(),
-      close: vi.fn(),
+      disconnect,
+      close,
     }
-    connections.push(connection)
-    return connection
+    connections.push({ handlers, disconnect, close })
+    return socket
   }
 }
 

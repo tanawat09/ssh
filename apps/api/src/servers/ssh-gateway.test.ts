@@ -122,12 +122,9 @@ async function startSshServer(): Promise<RunningSshServer> {
         await Promise.race([
           connectionClosed,
           new Promise<never>((_resolve, reject) => {
-            guard = setTimeout(
-              () => {
-                reject(new Error('SSH client connection remained open'))
-              },
-              1_000,
-            )
+            guard = setTimeout(() => {
+              reject(new Error('SSH client connection remained open'))
+            }, 1_000)
           }),
         ])
       } finally {

@@ -131,12 +131,11 @@ export class SshTerminalGateway {
       const expectedHostKey = Buffer.from(material.hostKeyBase64, 'base64')
       let hostKeyMismatch = false
       let settled = false
-      let timer: NodeJS.Timeout | undefined
 
       const fail = (error: ApplicationError): void => {
         if (settled) return
         settled = true
-        if (timer !== undefined) clearTimeout(timer)
+        clearTimeout(timer)
         safeEnd(client)
         reject(error)
       }
@@ -144,7 +143,7 @@ export class SshTerminalGateway {
       const succeed = (channel: ClientChannel): void => {
         if (settled) return
         settled = true
-        if (timer !== undefined) clearTimeout(timer)
+        clearTimeout(timer)
         resolve(new Ssh2Terminal(client, channel))
       }
 
@@ -170,7 +169,7 @@ export class SshTerminalGateway {
           height: 0,
         }
         client.shell(pty, (error, channel) => {
-          if (error !== undefined || channel === undefined) {
+          if (error) {
             fail(connectionError())
           } else {
             succeed(channel)
@@ -186,7 +185,9 @@ export class SshTerminalGateway {
           fail(connectionError())
         }
       })
-      timer = setTimeout(() => fail(timeoutError()), timeoutMs)
+      const timer = setTimeout(() => {
+        fail(timeoutError())
+      }, timeoutMs)
 
       try {
         if (credential.authType === 'password') {

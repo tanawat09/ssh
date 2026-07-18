@@ -4,10 +4,7 @@ import type { preHandlerAsyncHookHandler } from 'fastify'
 import { ApplicationError } from '../domain/application-error.js'
 
 export type Role = 'admin'
-export type Permission =
-  | 'servers:create'
-  | 'servers:read'
-  | 'servers:connect'
+export type Permission = 'servers:create' | 'servers:read' | 'servers:connect'
 
 const permissionsByRole = {
   admin: new Set<Permission>([

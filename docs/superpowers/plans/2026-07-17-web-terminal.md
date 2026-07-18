@@ -21,12 +21,14 @@
 ### Task 1: Shared Terminal Protocol
 
 **Files:**
+
 - Create: `packages/shared/src/terminal-contract.ts`
 - Create: `packages/shared/src/terminal-contract.test.ts`
 - Modify: `packages/shared/src/api-error.ts`
 - Modify: `packages/shared/src/index.ts`
 
 **Interfaces:**
+
 - Produces: `parseTerminalClientMessage(value: string): TerminalClientMessage | undefined`
 - Produces: `serializeTerminalServerMessage(message: TerminalServerMessage): string`
 - Produces: stable terminal error codes in `ApiErrorCode`
@@ -61,6 +63,7 @@ git commit -m "feat(shared): define terminal websocket protocol"
 ### Task 2: Connection Material, Permission, and Audit Allowlist
 
 **Files:**
+
 - Modify: `apps/api/src/database/server-repository.ts`
 - Modify: `apps/api/src/database/server-repository.test.ts`
 - Modify: `apps/api/src/database/audit-repository.ts`
@@ -69,6 +72,7 @@ git commit -m "feat(shared): define terminal websocket protocol"
 - Modify: `apps/api/src/security/permissions.test.ts`
 
 **Interfaces:**
+
 - Produces: `ServerConnectionMaterial` containing endpoint, auth type, stored host key, and `EncryptedCredential`
 - Produces: `ServerRepository.getConnectionMaterialById(id: string): ServerConnectionMaterial | undefined`
 - Produces: permission literal `servers:connect`
@@ -101,10 +105,12 @@ git commit -m "feat(api): expose protected terminal connection material"
 ### Task 3: Terminal Session Manager
 
 **Files:**
+
 - Create: `apps/api/src/terminal/terminal-session-manager.ts`
 - Create: `apps/api/src/terminal/terminal-session-manager.test.ts`
 
 **Interfaces:**
+
 - Produces: `reserve(actor: string, serverId: string): TerminalReservation`
 - Produces: `TerminalReservation` with `id`, `actor`, `serverId`, and idempotent `release()`
 - Throws: `ApplicationError` with duplicate or limit error codes
@@ -137,10 +143,12 @@ git commit -m "feat(api): enforce terminal session limits"
 ### Task 4: SSH PTY Gateway
 
 **Files:**
+
 - Create: `apps/api/src/terminal/ssh-terminal-gateway.ts`
 - Create: `apps/api/src/terminal/ssh-terminal-gateway.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ServerConnectionMaterial` and decrypted `ServerCredential`
 - Produces: `openTerminal(options): Promise<SshTerminal>`
 - Produces: `SshTerminal` with `write`, `resize`, `pause`, `resume`, `close`, `onData`, and `onClose`
@@ -173,6 +181,7 @@ git commit -m "feat(api): open verified interactive ssh terminals"
 ### Task 5: Authenticated WebSocket Route
 
 **Files:**
+
 - Modify: `apps/api/package.json`
 - Modify: `package-lock.json`
 - Create: `apps/api/src/terminal/terminal-route.ts`
@@ -182,6 +191,7 @@ git commit -m "feat(api): open verified interactive ssh terminals"
 - Modify: `apps/api/src/server.ts`
 
 **Interfaces:**
+
 - Consumes: repository, cipher, gateway, manager, audit repository, timeout, allowed origin
 - Produces: authenticated `GET /api/v1/servers/:serverId/terminal` WebSocket route
 
@@ -219,12 +229,14 @@ git commit -m "feat(api): stream terminal sessions over websocket"
 ### Task 6: Frontend Terminal Session Store
 
 **Files:**
+
 - Create: `apps/web/src/lib/terminal-socket.ts`
 - Create: `apps/web/src/lib/terminal-socket.test.ts`
 - Create: `apps/web/src/stores/terminal-sessions.ts`
 - Create: `apps/web/src/stores/terminal-sessions.test.ts`
 
 **Interfaces:**
+
 - Produces: same-origin `createTerminalSocket(serverId, handlers)`
 - Produces: Pinia actions `connect`, `activate`, `disconnect`, and `disconnectAll`
 - Produces: maximum five tabs and one tab per server in client state
@@ -257,6 +269,7 @@ git commit -m "feat(web): manage multiple terminal sockets"
 ### Task 7: xterm Terminal Tabs Workspace
 
 **Files:**
+
 - Modify: `apps/web/package.json`
 - Modify: `package-lock.json`
 - Create: `apps/web/src/components/TerminalPane.vue`
@@ -269,6 +282,7 @@ git commit -m "feat(web): manage multiple terminal sockets"
 - Modify: `apps/web/src/style.css`
 
 **Interfaces:**
+
 - Consumes: terminal store, `ServerDto[]`, xterm input/output, FitAddon dimensions
 - Produces: authenticated `/terminals` route and Connect actions from server list
 
@@ -306,12 +320,14 @@ git commit -m "feat(web): add multi-tab ssh terminal workspace"
 ### Task 8: Proxy and End-to-End Terminal Flow
 
 **Files:**
+
 - Modify: `apps/web/nginx.conf`
 - Modify: `tests/e2e/fixtures/ssh-server.ts`
 - Create: `tests/e2e/web-terminal.spec.ts`
 - Create: `tests/e2e/web-terminal.mobile.spec.ts`
 
 **Interfaces:**
+
 - Produces: WebSocket-capable Nginx `/api/` proxy
 - Produces: local PTY/shell fixture supporting deterministic commands and resize
 
@@ -349,9 +365,11 @@ git commit -m "test: verify interactive web terminal flows"
 ### Task 9: Full Quality and Deployment Verification
 
 **Files:**
+
 - Modify only files required to correct defects revealed by verification.
 
 **Interfaces:**
+
 - Produces: a reproducible production build and healthy Docker Compose deployment.
 
 - [ ] **Step 1: Run repository quality gates**

@@ -34,7 +34,9 @@ export const useTerminalSessionsStore = defineStore('terminal-sessions', () => {
   function deliverOutput(serverId: string, data: Uint8Array): void {
     const subscribers = outputSubscribers.get(serverId)
     if (subscribers !== undefined && subscribers.size > 0) {
-      subscribers.forEach((subscriber) => subscriber(data))
+      subscribers.forEach((subscriber) => {
+        subscriber(data)
+      })
       return
     }
 
@@ -88,7 +90,9 @@ export const useTerminalSessionsStore = defineStore('terminal-sessions', () => {
           current.errorCode = undefined
           current.errorMessage = ''
         },
-        onOutput: (data) => deliverOutput(server.id, data),
+        onOutput: (data) => {
+          deliverOutput(server.id, data)
+        },
         onError: (code, message) => {
           const current = findTab(server.id)
           if (current === undefined) return
@@ -137,7 +141,9 @@ export const useTerminalSessionsStore = defineStore('terminal-sessions', () => {
   }
 
   function disconnectAll(): void {
-    connections.forEach((connection) => connection.close())
+    connections.forEach((connection) => {
+      connection.close()
+    })
     connections.clear()
     outputSubscribers.clear()
     pendingOutput.clear()

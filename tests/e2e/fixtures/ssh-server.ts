@@ -6,6 +6,7 @@ import {
   request as httpRequest,
 } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { createConnection } from 'node:net'
 import { tmpdir } from 'node:os'
 import { extname, join, normalize } from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -16,6 +17,11 @@ import ssh2, { type Server as SshServer } from 'ssh2'
 const adminPassword = 'e2e-admin-password'
 const sshUsername = 'e2e-ssh-user'
 const mobileSshUsername = 'e2e-mobile-user'
+const terminalUsernames = new Set([
+  'e2e-terminal-one',
+  'e2e-terminal-two',
+  'e2e-terminal-mobile',
+])
 const sshPassword = 'e2e-ssh-password'
 const webOrigin = 'http://127.0.0.1:4173'
 const apiPort = 3000
@@ -119,6 +125,26 @@ function startWebServer() {
     response.setHeader('content-type', contentType(filePath))
     createReadStream(filePath).pipe(response)
   })
+  server.on('upgrade', (request, socket, head) => {
+    const upstream = createConnection(
+      { host: '127.0.0.1', port: apiPort },
+      () => {
+        upstream.write(
+          `${request.method ?? 'GET'} ${request.url ?? '/'} HTTP/${request.httpVersion}\r\n`,
+        )
+        for (let index = 0; index < request.rawHeaders.length; index += 2) {
+          upstream.write(
+            `${request.rawHeaders[index] ?? ''}: ${request.rawHeaders[index + 1] ?? ''}\r\n`,
+          )
+        }
+        upstream.write('\r\n')
+        if (head.length > 0) upstream.write(head)
+        socket.pipe(upstream).pipe(socket)
+      },
+    )
+    upstream.once('error', () => socket.destroy())
+    socket.once('error', () => upstream.destroy())
+  })
   server.listen(4173, '127.0.0.1')
   return once(server, 'listening').then(() => server)
 }
@@ -151,17 +177,20 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const clientPublicSsh = parsedClientKey.getPublicSSH()
 
   const sshServer = new ssh2.Server({ hostKeys: [hostKey] }, (client) => {
+    let authenticatedUsername = ''
     client.on('authentication', (context) => {
       const authenticate = (): void => {
         if (
           context.username !== sshUsername &&
-          context.username !== mobileSshUsername
+          context.username !== mobileSshUsername &&
+          !terminalUsernames.has(context.username)
         ) {
           context.reject()
           return
         }
         if (context.method === 'password') {
           if (context.password === sshPassword) {
+            authenticatedUsername = context.username
             context.accept()
           } else {
             context.reject()
@@ -184,6 +213,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
               context.hashAlgo,
             )
           if (validSignature) {
+            authenticatedUsername = context.username
             context.accept()
           } else {
             context.reject()
@@ -198,6 +228,38 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       } else {
         authenticate()
       }
+    })
+    client.on('ready', () => {
+      client.on('session', (accept) => {
+        const session = accept()
+        session.on('pty', (acceptPty) => {
+          acceptPty()
+        })
+        session.on('window-change', () => {
+          // The fixture does not need to retain terminal dimensions.
+        })
+        session.on('shell', (acceptShell) => {
+          const stream = acceptShell()
+          const prompt = `${authenticatedUsername}@fixture:~$ `
+          let pending = ''
+          stream.write(prompt)
+          stream.on('data', (chunk: Buffer) => {
+            pending += chunk.toString('utf8')
+            const commands = pending.split(/[\r\n]/)
+            pending = commands.pop() ?? ''
+            for (const command of commands) {
+              if (command.length === 0) continue
+              stream.write(`${command}\r\n`)
+              if (command === 'whoami') {
+                stream.write(`${authenticatedUsername}\r\n`)
+              } else if (command.startsWith('echo ')) {
+                stream.write(`${command.slice(5)}\r\n`)
+              }
+              stream.write(prompt)
+            }
+          })
+        })
+      })
     })
   })
   const sshPort = await listen(sshServer)

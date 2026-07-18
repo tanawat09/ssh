@@ -101,6 +101,19 @@ export function createTerminalSocket(
   )
   socket.binaryType = 'arraybuffer'
   let closedNotified = false
+  let queuedBytes = 0
+  const queuedMessages: string[] = []
+  const maximumQueuedBytes = 65_536
+  const textEncoder = new TextEncoder()
+
+  socket.addEventListener('open', () => {
+    while (socket.readyState === WebSocket.OPEN) {
+      const payload = queuedMessages.shift()
+      if (payload === undefined) break
+      queuedBytes -= textEncoder.encode(payload).byteLength
+      socket.send(payload)
+    }
+  })
 
   socket.addEventListener('message', (event) => {
     if (event.data instanceof ArrayBuffer) {
@@ -136,22 +149,45 @@ export function createTerminalSocket(
     )
   })
   socket.addEventListener('close', () => {
+    queuedMessages.length = 0
+    queuedBytes = 0
     if (!closedNotified) handlers.onClosed('error')
   })
 
   const send = (message: object): void => {
+    const payload = JSON.stringify(message)
     if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message))
+      socket.send(payload)
+      return
+    }
+    if (socket.readyState === WebSocket.CONNECTING) {
+      const payloadBytes = textEncoder.encode(payload).byteLength
+      if (queuedBytes + payloadBytes <= maximumQueuedBytes) {
+        queuedMessages.push(payload)
+        queuedBytes += payloadBytes
+      } else {
+        handlers.onError(
+          ApiErrorCode.TERMINAL_PROTOCOL_ERROR,
+          'Terminal input exceeded the local buffer limit',
+        )
+        socket.close()
+      }
     }
   }
 
   return {
-    sendInput: (data) => send({ type: 'input', data }),
-    resize: (cols, rows) => send({ type: 'resize', cols, rows }),
+    sendInput: (data) => {
+      send({ type: 'input', data })
+    },
+    resize: (cols, rows) => {
+      send({ type: 'resize', cols, rows })
+    },
     disconnect: () => {
       send({ type: 'disconnect' })
       socket.close()
     },
-    close: () => socket.close(),
+    close: () => {
+      socket.close()
+    },
   }
 }

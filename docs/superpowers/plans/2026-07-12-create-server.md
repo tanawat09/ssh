@@ -74,12 +74,14 @@
 ### Task 1: Workspace And Runtime-Safe Shared Contracts
 
 **Files:**
+
 - Create: `package.json`, `tsconfig.base.json`, `eslint.config.js`, `.prettierrc.json`, `.gitignore`
 - Create: `packages/shared/package.json`, `packages/shared/tsconfig.json`, `packages/shared/vitest.config.ts`
 - Create: `packages/shared/src/auth-contract.ts`, `packages/shared/src/server-contract.ts`, `packages/shared/src/api-error.ts`, `packages/shared/src/index.ts`
 - Test: `packages/shared/src/server-contract.test.ts`
 
 **Interfaces:**
+
 - Produces: `LoginRequestSchema`, `SessionDtoSchema`, `CreateServerRequestSchema`, `ServerDtoSchema`, `ApiErrorSchema`, and their TypeBox `Static<>` types.
 - `CreateServerRequest` is a union discriminated by `authType: "password" | "privateKey"`.
 
@@ -107,22 +109,47 @@ Expected: root and shared `package.json` files exist and `package-lock.json` pin
 Create tests that compile `CreateServerRequestSchema` with `TypeCompiler.Compile()` and assert:
 
 ```ts
-expect(check.Check({
-  name: 'Production', host: 'server.example.com', port: 22,
-  username: 'deploy', authType: 'password', password: 'secret'
-})).toBe(true)
-expect(check.Check({
-  name: 'Production', host: 'server.example.com', port: 22,
-  username: 'deploy', authType: 'privateKey', privateKey: 'pem', passphrase: 'secret'
-})).toBe(true)
-expect(check.Check({
-  name: 'Production', host: 'server.example.com', port: 0,
-  username: 'deploy', authType: 'password', password: 'secret'
-})).toBe(false)
-expect(check.Check({
-  name: 'Production', host: 'server.example.com', port: 22,
-  username: 'deploy', authType: 'password', privateKey: 'pem'
-})).toBe(false)
+expect(
+  check.Check({
+    name: 'Production',
+    host: 'server.example.com',
+    port: 22,
+    username: 'deploy',
+    authType: 'password',
+    password: 'secret',
+  }),
+).toBe(true)
+expect(
+  check.Check({
+    name: 'Production',
+    host: 'server.example.com',
+    port: 22,
+    username: 'deploy',
+    authType: 'privateKey',
+    privateKey: 'pem',
+    passphrase: 'secret',
+  }),
+).toBe(true)
+expect(
+  check.Check({
+    name: 'Production',
+    host: 'server.example.com',
+    port: 0,
+    username: 'deploy',
+    authType: 'password',
+    password: 'secret',
+  }),
+).toBe(false)
+expect(
+  check.Check({
+    name: 'Production',
+    host: 'server.example.com',
+    port: 22,
+    username: 'deploy',
+    authType: 'password',
+    privateKey: 'pem',
+  }),
+).toBe(false)
 ```
 
 - [ ] **Step 3: Verify the tests fail before schemas exist**
@@ -137,13 +164,16 @@ Use `Type.Object(..., { additionalProperties: false })`, `Type.Union` for the tw
 
 ```ts
 export const ApiErrorCode = {
-  INVALID_REQUEST: 'INVALID_REQUEST', UNAUTHENTICATED: 'UNAUTHENTICATED',
-  FORBIDDEN: 'FORBIDDEN', SERVER_ALREADY_EXISTS: 'SERVER_ALREADY_EXISTS',
+  INVALID_REQUEST: 'INVALID_REQUEST',
+  UNAUTHENTICATED: 'UNAUTHENTICATED',
+  FORBIDDEN: 'FORBIDDEN',
+  SERVER_ALREADY_EXISTS: 'SERVER_ALREADY_EXISTS',
   SSH_AUTHENTICATION_FAILED: 'SSH_AUTHENTICATION_FAILED',
-  SSH_CONNECTION_FAILED: 'SSH_CONNECTION_FAILED', SSH_TIMEOUT: 'SSH_TIMEOUT',
-  INTERNAL_ERROR: 'INTERNAL_ERROR'
+  SSH_CONNECTION_FAILED: 'SSH_CONNECTION_FAILED',
+  SSH_TIMEOUT: 'SSH_TIMEOUT',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const
-export type ApiErrorCode = typeof ApiErrorCode[keyof typeof ApiErrorCode]
+export type ApiErrorCode = (typeof ApiErrorCode)[keyof typeof ApiErrorCode]
 ```
 
 `ServerDto` must contain `id`, `name`, `host`, `port`, `username`, `authType`, `hostKeyAlgorithm`, `hostKeyFingerprint`, and ISO timestamps, with no credential fields.
@@ -164,6 +194,7 @@ git commit -m "feat: add shared API contracts"
 ### Task 2: Validated API Configuration And SQLite Foundation
 
 **Files:**
+
 - Create: `apps/api/package.json`, `apps/api/tsconfig.json`, `apps/api/vitest.config.ts`
 - Create: `apps/api/src/config.ts`
 - Create: `apps/api/src/database/database.ts`
@@ -171,6 +202,7 @@ git commit -m "feat: add shared API contracts"
 - Test: `apps/api/src/config.test.ts`, `apps/api/src/database/database.test.ts`
 
 **Interfaces:**
+
 - Produces: `AppConfig`, `loadConfig(env: NodeJS.ProcessEnv): AppConfig`, `openDatabase(path: string): Database.Database`, and `migrateDatabase(db): void`.
 - `AppConfig` exposes `nodeEnv`, parsed values, and a 32-byte `credentialEncryptionKey: Buffer`, never the original Base64 string.
 
@@ -229,10 +261,12 @@ git commit -m "feat: add API config and database schema"
 ### Task 3: Authenticated Credential Encryption
 
 **Files:**
+
 - Create: `apps/api/src/security/credential-cipher.ts`
 - Test: `apps/api/src/security/credential-cipher.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppConfig.credentialEncryptionKey`.
 - Produces: `CredentialCipher.encrypt(credential: ServerCredential): EncryptedCredential` and `decrypt(value): ServerCredential`.
 - `ServerCredential` is the same discriminated password/private-key union used by the service, without server metadata.
@@ -245,8 +279,13 @@ Test password and private-key round trips, unique IVs for the same payload, and 
 const first = cipher.encrypt({ authType: 'password', password: 'secret' })
 const second = cipher.encrypt({ authType: 'password', password: 'secret' })
 expect(first.iv).not.toBe(second.iv)
-expect(cipher.decrypt(first)).toEqual({ authType: 'password', password: 'secret' })
-expect(() => cipher.decrypt({ ...first, authTag: mutate(first.authTag) })).toThrow()
+expect(cipher.decrypt(first)).toEqual({
+  authType: 'password',
+  password: 'secret',
+})
+expect(() =>
+  cipher.decrypt({ ...first, authTag: mutate(first.authTag) }),
+).toThrow()
 ```
 
 - [ ] **Step 2: Run the test and verify failure**
@@ -275,11 +314,13 @@ git commit -m "feat: encrypt SSH credentials at rest"
 ### Task 4: Admin Login, JWT Cookie, Origin Check, And Permissions
 
 **Files:**
+
 - Create: `apps/api/src/app.ts`, `apps/api/src/domain/application-error.ts`
 - Create: `apps/api/src/auth/auth-route.ts`, `apps/api/src/security/permissions.ts`
 - Test: `apps/api/src/auth/auth-route.test.ts`, `apps/api/src/security/permissions.test.ts`
 
 **Interfaces:**
+
 - Produces: `buildApp(options: BuildAppOptions): FastifyInstance` and `requirePermission('servers:create')` pre-handler.
 - JWT payload is `{ sub: 'admin', role: 'admin' }`; frontend response is `{ user: { username, role: 'admin' } }`.
 
@@ -311,7 +352,7 @@ Define permissions without route-specific conditionals:
 
 ```ts
 const permissionsByRole = {
-  admin: new Set<Permission>(['servers:create'])
+  admin: new Set<Permission>(['servers:create']),
 } satisfies Record<Role, ReadonlySet<Permission>>
 ```
 
@@ -331,10 +372,12 @@ git commit -m "feat: add admin JWT authentication"
 ### Task 5: Server And Audit Repositories
 
 **Files:**
+
 - Create: `apps/api/src/database/server-repository.ts`, `apps/api/src/database/audit-repository.ts`
 - Test: `apps/api/src/database/server-repository.test.ts`, `apps/api/src/database/audit-repository.test.ts`
 
 **Interfaces:**
+
 - Produces: `ServerRepository.existsByEndpoint(endpoint): boolean` and `createWithAudit(record, encrypted, event): ServerDto`.
 - Produces: `AuditRepository.recordFailure(event): void`.
 - Repository inputs contain already normalized public fields and already encrypted credential fields.
@@ -344,10 +387,24 @@ git commit -m "feat: add admin JWT authentication"
 Assert case-normalized host uniqueness, port/username tuple behavior, atomic insertion into all three tables, rollback after a forced audit insert failure, and sanitized failure metadata.
 
 ```ts
-expect(repo.existsByEndpoint({ host: 'server.example.com', port: 22, username: 'deploy' })).toBe(false)
+expect(
+  repo.existsByEndpoint({
+    host: 'server.example.com',
+    port: 22,
+    username: 'deploy',
+  }),
+).toBe(false)
 repo.createWithAudit(server, encrypted, successEvent)
-expect(repo.existsByEndpoint({ host: 'server.example.com', port: 22, username: 'deploy' })).toBe(true)
-expect(db.prepare('select count(*) count from server_credentials').get()).toEqual({ count: 1 })
+expect(
+  repo.existsByEndpoint({
+    host: 'server.example.com',
+    port: 22,
+    username: 'deploy',
+  }),
+).toBe(true)
+expect(
+  db.prepare('select count(*) count from server_credentials').get(),
+).toEqual({ count: 1 })
 ```
 
 - [ ] **Step 2: Verify tests fail**
@@ -376,10 +433,12 @@ git commit -m "feat: persist servers and audit events atomically"
 ### Task 6: ssh2 Gateway With TOFU Host-Key Capture
 
 **Files:**
+
 - Create: `apps/api/src/servers/ssh-gateway.ts`
 - Test: `apps/api/src/servers/ssh-gateway.test.ts`
 
 **Interfaces:**
+
 - Produces: `SshGateway.testConnection(request, timeoutMs): Promise<VerifiedHostKey>`.
 - `VerifiedHostKey` is `{ algorithm: string; fingerprint: string; keyBase64: string }`.
 - Gateway errors are `ApplicationError` values using SSH authentication, connection, or timeout codes.
@@ -416,11 +475,13 @@ git commit -m "feat: test SSH credentials and capture host keys"
 ### Task 7: Create Server Service And Protected Route
 
 **Files:**
+
 - Create: `apps/api/src/servers/create-server-service.ts`, `apps/api/src/servers/server-route.ts`, `apps/api/src/server.ts`
 - Modify: `apps/api/src/app.ts`
 - Test: `apps/api/src/servers/create-server-service.test.ts`, `apps/api/src/servers/server-route.test.ts`
 
 **Interfaces:**
+
 - Consumes: shared `CreateServerRequest`, `SshGateway`, `CredentialCipher`, `ServerRepository`, and `AuditRepository`.
 - Produces: `CreateServerService.execute(input, context): Promise<ServerDto>` and protected `POST /api/v1/servers`.
 
@@ -462,6 +523,7 @@ git commit -m "feat: add protected create server API"
 ### Task 8: Vue Login And Create Server Experience
 
 **Files:**
+
 - Create: `apps/web/package.json`, `apps/web/tsconfig.json`, `apps/web/vite.config.ts`, `apps/web/vitest.config.ts`, `apps/web/index.html`
 - Create: `apps/web/src/main.ts`, `apps/web/src/App.vue`, `apps/web/src/router.ts`, `apps/web/src/style.css`
 - Create: `apps/web/src/lib/api-client.ts`, `apps/web/src/stores/session.ts`
@@ -470,6 +532,7 @@ git commit -m "feat: add protected create server API"
 - Test: corresponding `*.test.ts` files next to store, component, and views
 
 **Interfaces:**
+
 - Consumes: shared login, error, Create Server, and Server DTO contracts.
 - Produces: `/login` and `/servers/new` routes; no server-list route.
 
@@ -522,6 +585,7 @@ git commit -m "feat: add create server web flow"
 ### Task 9: Docker, End-To-End Coverage, And Delivery Gate
 
 **Files:**
+
 - Create: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `apps/web/nginx.conf`
 - Create: `compose.yaml`, `.env.example`, `playwright.config.ts`
 - Create: `tests/e2e/fixtures/ssh-server.ts`, `tests/e2e/create-server.spec.ts`
@@ -529,6 +593,7 @@ git commit -m "feat: add create server web flow"
 - Create: `README.md`
 
 **Interfaces:**
+
 - Produces: same-origin application at `http://localhost:8080`; `/api/*` proxies to the internal API container.
 - The E2E fixture listens only on loopback, generates its host key at runtime, and accepts deterministic test credentials.
 

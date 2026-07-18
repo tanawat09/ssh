@@ -24,9 +24,8 @@ const material: ServerConnectionMaterial = {
 
 class FakeChannel extends EventEmitter {
   readonly write = vi.fn<(data: string) => boolean>(() => true)
-  readonly setWindow = vi.fn<
-    (rows: number, cols: number, height: number, width: number) => void
-  >()
+  readonly setWindow =
+    vi.fn<(rows: number, cols: number, height: number, width: number) => void>()
   readonly pause = vi.fn<() => void>()
   readonly resume = vi.fn<() => void>()
   readonly end = vi.fn<() => void>()
@@ -39,8 +38,8 @@ class FakeClient extends EventEmitter {
   readonly end = vi.fn<() => void>()
 
   constructor(
-    private readonly behavior: 'ready' | 'auth-error' | 'connection-error' | 'silent' =
-      'ready',
+    private readonly behavior:
+      'ready' | 'auth-error' | 'connection-error' | 'silent' = 'ready',
     private readonly presentedHostKey = hostKey,
   ) {
     super()
@@ -64,12 +63,8 @@ class FakeClient extends EventEmitter {
         return
       }
       const verifyHost = config.hostVerifier as
-        | ((
-            key: Buffer,
-            callback: (verified: boolean) => void,
-          ) => boolean | void)
-        | undefined
-      if (verifyHost?.(this.presentedHostKey, () => undefined) !== true) {
+        ((key: Buffer) => boolean) | undefined
+      if (verifyHost?.(this.presentedHostKey) !== true) {
         this.emit('error', new Error('host rejected'))
         return
       }
@@ -79,7 +74,10 @@ class FakeClient extends EventEmitter {
 
   shell(
     options: Record<string, unknown>,
-    callback: (error: Error | undefined, channel: ClientChannel | undefined) => void,
+    callback: (
+      error: Error | undefined,
+      channel: ClientChannel | undefined,
+    ) => void,
   ): void {
     this.shellOptions = options
     callback(undefined, this.channel as unknown as ClientChannel)
@@ -186,18 +184,21 @@ describe('SshTerminalGateway', () => {
   it.each([
     ['auth-error' as const, 'SSH_AUTHENTICATION_FAILED', 422],
     ['connection-error' as const, 'SSH_CONNECTION_FAILED', 502],
-  ])('maps %s without exposing the raw ssh error', async (behavior, code, statusCode) => {
-    const client = new FakeClient(behavior)
+  ])(
+    'maps %s without exposing the raw ssh error',
+    async (behavior, code, statusCode) => {
+      const client = new FakeClient(behavior)
 
-    await expect(
-      gatewayFor(client).openTerminal({
-        material,
-        credential: { authType: 'password', password: 'test-password' },
-        timeoutMs: 1_000,
-      }),
-    ).rejects.toMatchObject({ code, statusCode })
-    expect(client.end).toHaveBeenCalledTimes(1)
-  })
+      await expect(
+        gatewayFor(client).openTerminal({
+          material,
+          credential: { authType: 'password', password: 'test-password' },
+          timeoutMs: 1_000,
+        }),
+      ).rejects.toMatchObject({ code, statusCode })
+      expect(client.end).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('closes an unresponsive client and returns the stable timeout', async () => {
     const client = new FakeClient('silent')

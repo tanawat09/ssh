@@ -27,7 +27,7 @@ describe('TerminalSessionManager', () => {
       manager.reserve('admin', `server-${String(index)}`)
     }
 
-    expect(() => manager.reserve('admin', 'server-6')).toThrowError(
+    expect(() => manager.reserve('admin', 'server-6')).toThrow(
       expect.objectContaining<Partial<ApplicationError>>({
         code: 'TERMINAL_SESSION_LIMIT',
         statusCode: 429,
@@ -40,7 +40,7 @@ describe('TerminalSessionManager', () => {
     const manager = new TerminalSessionManager()
     manager.reserve('admin', 'server-1')
 
-    expect(() => manager.reserve('admin', 'server-1')).toThrowError(
+    expect(() => manager.reserve('admin', 'server-1')).toThrow(
       expect.objectContaining<Partial<ApplicationError>>({
         code: 'TERMINAL_ALREADY_ACTIVE',
         statusCode: 409,
