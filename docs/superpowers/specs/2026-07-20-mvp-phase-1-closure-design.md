@@ -1,7 +1,7 @@
 # MVP Phase 1 Closure Design
 
 **Date:** 2026-07-20
-**Status:** Design approved; pending written review
+**Status:** Approved
 
 ## Goal
 
