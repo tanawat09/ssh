@@ -304,6 +304,152 @@ describe('ServerRepository', () => {
     ).toEqual({ count: 0 })
   })
 
+  it('hard deletes a server and credential while recording a sanitized success audit', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+    repository.createWithAudit(
+      serverRecord(),
+      encryptedCredential,
+      successEvent(),
+    )
+    repository.createWithAudit(
+      serverRecord({
+        id: 'server-2',
+        name: 'Staging',
+        host: 'staging.example.com',
+      }),
+      encryptedCredential,
+      successEvent({ id: 'audit-2', targetId: 'server-2' }),
+    )
+
+    const deleted = repository.deleteWithAudit(
+      'server-1',
+      successEvent({
+        id: 'audit-delete-1',
+        action: 'server.delete',
+        targetId: 'server-1',
+        metadata: { resource: 'server', secret: 'must-not-be-audited' },
+        createdAt: '2026-07-20T00:00:00.000Z',
+      }),
+    )
+
+    expect(deleted).toBe(true)
+    expect(repository.listAll().map(({ id }) => id)).toEqual(['server-2'])
+    expect(
+      database
+        .prepare(
+          'SELECT count(*) AS count FROM server_credentials WHERE server_id = ?',
+        )
+        .get('server-1'),
+    ).toEqual({ count: 0 })
+    expect(
+      database
+        .prepare(
+          `SELECT action, result, target_id, metadata
+           FROM audit_logs
+           WHERE id = ?`,
+        )
+        .get('audit-delete-1'),
+    ).toEqual({
+      action: 'server.delete',
+      result: 'success',
+      target_id: 'server-1',
+      metadata: JSON.stringify({ resource: 'server' }),
+    })
+  })
+
+  it('returns false without recording a success audit when the server is missing', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+
+    const deleted = repository.deleteWithAudit(
+      'missing',
+      successEvent({
+        id: 'audit-delete-missing',
+        action: 'server.delete',
+        targetId: 'missing',
+        metadata: { resource: 'server' },
+      }),
+    )
+
+    expect(deleted).toBe(false)
+    expect(
+      database
+        .prepare('SELECT count(*) AS count FROM audit_logs WHERE id = ?')
+        .get('audit-delete-missing'),
+    ).toEqual({ count: 0 })
+  })
+
+  it('rolls back the server and credential deletion when the success audit insert fails', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+    repository.createWithAudit(
+      serverRecord(),
+      encryptedCredential,
+      successEvent(),
+    )
+    database.exec(`
+      CREATE TRIGGER fail_delete_success_audit
+      BEFORE INSERT ON audit_logs
+      WHEN NEW.action = 'server.delete' AND NEW.result = 'success'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced delete audit failure');
+      END;
+    `)
+
+    expect(() =>
+      repository.deleteWithAudit(
+        'server-1',
+        successEvent({
+          id: 'audit-delete-1',
+          action: 'server.delete',
+          targetId: 'server-1',
+          metadata: { resource: 'server' },
+        }),
+      ),
+    ).toThrow('forced delete audit failure')
+    expect(repository.listAll().map(({ id }) => id)).toEqual(['server-1'])
+    expect(
+      database
+        .prepare(
+          'SELECT count(*) AS count FROM server_credentials WHERE server_id = ?',
+        )
+        .get('server-1'),
+    ).toEqual({ count: 1 })
+    expect(
+      database
+        .prepare('SELECT count(*) AS count FROM audit_logs WHERE id = ?')
+        .get('audit-delete-1'),
+    ).toEqual({ count: 0 })
+  })
+
+  it('rejects a failure audit event before deleting server data', () => {
+    const database = createDatabase()
+    const repository = new ServerRepository(database)
+    repository.createWithAudit(
+      serverRecord(),
+      encryptedCredential,
+      successEvent(),
+    )
+
+    expect(() =>
+      repository.deleteWithAudit(
+        'server-1',
+        successEvent({
+          id: 'audit-delete-1',
+          action: 'server.delete',
+          result: 'failure',
+        }),
+      ),
+    ).toThrow('ServerRepository.deleteWithAudit requires a success event')
+    expect(repository.listAll().map(({ id }) => id)).toEqual(['server-1'])
+    expect(
+      database
+        .prepare('SELECT count(*) AS count FROM audit_logs WHERE id = ?')
+        .get('audit-delete-1'),
+    ).toEqual({ count: 0 })
+  })
+
   it('maps an endpoint uniqueness constraint to the stable duplicate error', () => {
     const database = createDatabase()
     const repository = new ServerRepository(database)

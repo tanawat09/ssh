@@ -50,11 +50,16 @@ export class ServerRepository {
   readonly #insertServer: Database.Statement
   readonly #insertCredential: Database.Statement
   readonly #insertSuccessAudit: Database.Statement
+  readonly #deleteServer: Database.Statement
   readonly #createWithAuditTransaction: (
     record: ServerRecord,
     encrypted: EncryptedCredential,
     event: AuditEvent,
   ) => void
+  readonly #deleteWithAuditTransaction: (
+    id: string,
+    event: AuditEvent,
+  ) => boolean
 
   constructor(database: Database.Database) {
     this.#existsByEndpoint = database.prepare(`
@@ -95,6 +100,7 @@ export class ServerRepository {
         metadata, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
+    this.#deleteServer = database.prepare('DELETE FROM servers WHERE id = ?')
     this.#createWithAuditTransaction = database.transaction(
       (
         record: ServerRecord,
@@ -131,6 +137,26 @@ export class ServerRepository {
           serializeAuditMetadata(event.metadata),
           event.createdAt,
         )
+      },
+    )
+    this.#deleteWithAuditTransaction = database.transaction(
+      (id: string, event: AuditEvent): boolean => {
+        const result = this.#deleteServer.run(id)
+        if (result.changes === 0) {
+          return false
+        }
+        this.#insertSuccessAudit.run(
+          event.id,
+          event.action,
+          event.result,
+          event.actor,
+          event.targetType,
+          event.targetId ?? null,
+          event.sourceIp ?? null,
+          serializeAuditMetadata(event.metadata),
+          event.createdAt,
+        )
+        return true
       },
     )
   }
@@ -241,5 +267,14 @@ export class ServerRepository {
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     }
+  }
+
+  deleteWithAudit(id: string, event: AuditEvent): boolean {
+    if (event.result !== 'success') {
+      throw new Error(
+        'ServerRepository.deleteWithAudit requires a success event',
+      )
+    }
+    return this.#deleteWithAuditTransaction(id, event)
   }
 }
