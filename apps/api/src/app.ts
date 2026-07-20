@@ -15,6 +15,7 @@ import { ApplicationError } from './domain/application-error.js'
 import {
   registerServerRoute,
   type CreateServerExecutor,
+  type DeleteServerExecutor,
   type ListServerExecutor,
 } from './servers/server-route.js'
 import {
@@ -25,6 +26,7 @@ import {
 export interface BuildAppOptions {
   config: AppConfig
   createServerService?: CreateServerExecutor
+  deleteServerService?: DeleteServerExecutor
   listServerService?: ListServerExecutor
   terminalRouteDependencies?: TerminalRouteDependencies
 }
@@ -131,10 +133,12 @@ function sendError(error: unknown, reply: FastifyReply) {
 export function buildApp({
   config,
   createServerService,
+  deleteServerService,
   listServerService,
   terminalRouteDependencies,
 }: BuildAppOptions): FastifyInstance {
   const app = Fastify({
+    routerOptions: { maxParamLength: 256 },
     trustProxy: config.nodeEnv === 'production' ? trustedProxyCidrs : false,
     logger:
       config.nodeEnv === 'production'
@@ -203,8 +207,17 @@ export function buildApp({
   )
   app.register((instance, _options, done) => {
     registerAuthRoute(instance, { config })
-    if (createServerService !== undefined || listServerService !== undefined) {
-      registerServerRoute(instance, createServerService, listServerService)
+    if (
+      createServerService !== undefined ||
+      listServerService !== undefined ||
+      deleteServerService !== undefined
+    ) {
+      registerServerRoute(
+        instance,
+        createServerService,
+        listServerService,
+        deleteServerService,
+      )
     }
     if (terminalRouteDependencies !== undefined) {
       registerTerminalRoute(instance, terminalRouteDependencies)

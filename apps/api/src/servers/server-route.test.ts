@@ -70,6 +70,18 @@ async function setupList(execute = vi.fn(() => Promise.resolve([dto]))) {
   return { app, execute, token }
 }
 
+async function setupDelete(
+  execute = vi.fn<
+    (serverId: string, context: { actor: string; sourceIp?: string }) => void
+  >(),
+) {
+  const app = buildApp({ config, deleteServerService: { execute } })
+  apps.push(app)
+  await app.ready()
+  const token = app.jwt.sign({ sub: 'admin', role: 'admin' })
+  return { app, execute, token }
+}
+
 async function setupWithConfig(
   configured: AppConfig,
   execute = vi.fn(() => Promise.resolve(dto)),
@@ -87,6 +99,14 @@ function request(token: string, payload: object = passwordRequest) {
     url: '/api/v1/servers',
     headers: { origin, cookie: `remote_session=${token}` },
     payload,
+  }
+}
+
+function deleteRequest(token: string, serverId = 'server-1') {
+  return {
+    method: 'DELETE' as const,
+    url: `/api/v1/servers/${serverId}`,
+    headers: { origin, cookie: `remote_session=${token}` },
   }
 }
 
@@ -258,5 +278,120 @@ describe('GET /api/v1/servers', () => {
       actor: 'admin',
       sourceIp: '127.0.0.1',
     })
+  })
+})
+
+describe('DELETE /api/v1/servers/:serverId', () => {
+  it('returns 204 and passes the authenticated actor and source IP', async () => {
+    const { app, execute, token } = await setupDelete()
+
+    const response = await app.inject(deleteRequest(token))
+
+    expect(response.statusCode).toBe(204)
+    expect(response.body).toBe('')
+    expect(execute).toHaveBeenCalledWith('server-1', {
+      actor: 'admin',
+      sourceIp: '127.0.0.1',
+    })
+  })
+
+  it('requires authentication and servers:delete permission', async () => {
+    const { app, execute } = await setupDelete()
+    const unauthenticated = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/servers/server-1',
+      headers: { origin },
+    })
+    const viewer = app.jwt.sign({ sub: 'viewer', role: 'viewer' })
+    const forbidden = await app.inject(deleteRequest(viewer))
+
+    expect(unauthenticated.statusCode).toBe(401)
+    expect(unauthenticated.json()).toEqual({
+      error: {
+        code: ApiErrorCode.UNAUTHENTICATED,
+        message: 'Authentication required',
+      },
+    })
+    expect(forbidden.statusCode).toBe(403)
+    expect(forbidden.json()).toEqual({
+      error: { code: ApiErrorCode.FORBIDDEN, message: 'Permission denied' },
+    })
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('requires the exact configured Origin', async () => {
+    const { app, execute, token } = await setupDelete()
+
+    for (const headers of [
+      { cookie: `remote_session=${token}` },
+      { origin: 'https://attacker.test', cookie: `remote_session=${token}` },
+    ]) {
+      const response = await app.inject({
+        ...deleteRequest(token),
+        headers,
+      })
+      expect(response.statusCode).toBe(403)
+      expect(response.json()).toEqual({
+        error: {
+          code: ApiErrorCode.FORBIDDEN,
+          message: 'Origin is not allowed',
+        },
+      })
+    }
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('rejects a server ID longer than 128 characters', async () => {
+    const { app, execute, token } = await setupDelete()
+
+    const response = await app.inject(deleteRequest(token, 's'.repeat(129)))
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({
+      error: { code: ApiErrorCode.INVALID_REQUEST, message: 'Invalid request' },
+    })
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [ApiErrorCode.SERVER_NOT_FOUND, 404, 'Server not found'],
+    [
+      ApiErrorCode.SERVER_HAS_ACTIVE_SESSION,
+      409,
+      'Disconnect the active terminal before deleting this server',
+    ],
+  ] as const)(
+    'propagates %s as a stable %i response',
+    async (code, status, message) => {
+      const { app, token } = await setupDelete(
+        vi.fn(() => {
+          throw new ApplicationError(code, status, message)
+        }),
+      )
+
+      const response = await app.inject(deleteRequest(token))
+
+      expect(response.statusCode).toBe(status)
+      expect(response.json()).toEqual({ error: { code, message } })
+    },
+  )
+
+  it('maps unexpected errors to a stable 500 response', async () => {
+    const { app, token } = await setupDelete(
+      vi.fn(() => {
+        throw new Error('SQLITE secret detail')
+      }),
+    )
+
+    const response = await app.inject(deleteRequest(token))
+
+    expect(response.statusCode).toBe(500)
+    expect(response.json()).toEqual({
+      error: {
+        code: ApiErrorCode.INTERNAL_ERROR,
+        message: 'Internal server error',
+      },
+    })
+    expect(response.body).not.toContain('SQLITE secret detail')
   })
 })

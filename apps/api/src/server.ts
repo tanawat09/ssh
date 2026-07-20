@@ -5,6 +5,7 @@ import { migrateDatabase, openDatabase } from './database/database.js'
 import { ServerRepository } from './database/server-repository.js'
 import { CredentialCipher } from './security/credential-cipher.js'
 import { CreateServerService } from './servers/create-server-service.js'
+import { DeleteServerService } from './servers/delete-server-service.js'
 import { ListServerService } from './servers/list-server-service.js'
 import { Ssh2Gateway } from './servers/ssh-gateway.js'
 import { SshTerminalGateway } from './terminal/ssh-terminal-gateway.js'
@@ -39,9 +40,16 @@ async function start(): Promise<void> {
       serverRepository,
       auditRepository,
     })
+    const terminalSessionManager = new TerminalSessionManager()
+    const deleteServerService = new DeleteServerService({
+      serverRepository,
+      auditRepository,
+      sessionManager: terminalSessionManager,
+    })
     const app = buildApp({
       config,
       createServerService,
+      deleteServerService,
       listServerService,
       terminalRouteDependencies: {
         allowedOrigin: config.allowedOrigin,
@@ -49,7 +57,7 @@ async function start(): Promise<void> {
         serverRepository,
         credentialCipher,
         sshGateway: new SshTerminalGateway(),
-        sessionManager: new TerminalSessionManager(),
+        sessionManager: terminalSessionManager,
         auditRepository,
       },
     })

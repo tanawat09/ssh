@@ -21,11 +21,15 @@ export interface ListServerExecutor {
     sourceIp?: string
   }): Promise<ServerDto[]> | ServerDto[]
 }
+export interface DeleteServerExecutor {
+  execute(serverId: string, context: { actor: string; sourceIp?: string }): void
+}
 
 export function registerServerRoute(
   app: FastifyInstance,
   createServerService: CreateServerExecutor | undefined,
   listServerService?: ListServerExecutor,
+  deleteServerService?: DeleteServerExecutor,
 ): void {
   if (createServerService !== undefined)
     app.post(
@@ -72,6 +76,39 @@ export function registerServerRoute(
       },
       async (request) =>
         listServerService.execute({ actor: 'admin', sourceIp: request.ip }),
+    )
+  }
+  if (deleteServerService !== undefined) {
+    app.delete<{ Params: { serverId: string } }>(
+      '/api/v1/servers/:serverId',
+      {
+        preHandler: requirePermission('servers:delete'),
+        schema: {
+          params: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['serverId'],
+            properties: {
+              serverId: { type: 'string', minLength: 1, maxLength: 128 },
+            },
+          },
+          response: {
+            204: { type: 'null' },
+            401: ApiErrorSchema,
+            403: ApiErrorSchema,
+            404: ApiErrorSchema,
+            409: ApiErrorSchema,
+            500: ApiErrorSchema,
+          },
+        },
+      },
+      (request, reply) => {
+        deleteServerService.execute(request.params.serverId, {
+          actor: 'admin',
+          sourceIp: request.ip,
+        })
+        return reply.status(204).send()
+      },
     )
   }
 }
