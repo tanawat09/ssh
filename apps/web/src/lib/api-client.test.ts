@@ -77,6 +77,44 @@ describe('ApiClient', () => {
     })
   })
 
+  it('deletes an encoded server ID with credentials and accepts an empty response', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }))
+
+    await expect(
+      new ApiClient(fetcher).deleteServer('server/id'),
+    ).resolves.toBeUndefined()
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/servers/server%2Fid', {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+  })
+
+  it('parses active-session conflicts from delete responses', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: ApiErrorCode.SERVER_HAS_ACTIVE_SESSION,
+            message: 'Server has an active terminal session',
+          },
+        }),
+        { status: 409, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    await expect(
+      new ApiClient(fetcher).deleteServer('server-1'),
+    ).rejects.toEqual(
+      new ApiClientError(
+        409,
+        ApiErrorCode.SERVER_HAS_ACTIVE_SESSION,
+        'Server has an active terminal session',
+      ),
+    )
+  })
+
   it('parses typed API errors', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(

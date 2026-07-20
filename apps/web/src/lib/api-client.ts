@@ -68,26 +68,17 @@ export class ApiClient {
     return this.get('/api/v1/servers')
   }
 
+  deleteServer(serverId: string): Promise<void> {
+    return this.delete(`/api/v1/servers/${encodeURIComponent(serverId)}`)
+  }
+
   private async get<T>(path: string): Promise<T> {
     const response = await this.fetcher(path, {
       method: 'GET',
       credentials: 'include',
     })
-    let value: unknown
-    try {
-      value = await response.json()
-    } catch {
-      value = undefined
-    }
-    if (!response.ok) {
-      const parsed = parseError(value)
-      throw new ApiClientError(
-        response.status,
-        parsed?.error.code ?? ApiErrorCode.INTERNAL_ERROR,
-        parsed?.error.message ?? 'Request failed. Please try again.',
-        parsed?.error.fields,
-      )
-    }
+    const value = await this.readJson(response)
+    if (!response.ok) this.throwResponseError(response.status, value)
     return value as T
   }
 
@@ -98,29 +89,38 @@ export class ApiClient {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    let value: unknown
-    try {
-      value = await response.json()
-    } catch {
-      value = undefined
-    }
-    if (!response.ok) {
-      const parsed = parseError(value)
-      if (parsed !== undefined) {
-        throw new ApiClientError(
-          response.status,
-          parsed.error.code,
-          parsed.error.message,
-          parsed.error.fields,
-        )
-      }
-      throw new ApiClientError(
-        response.status,
-        ApiErrorCode.INTERNAL_ERROR,
-        'Request failed. Please try again.',
-      )
-    }
+    const value = await this.readJson(response)
+    if (!response.ok) this.throwResponseError(response.status, value)
     return value as T
+  }
+
+  private async delete(path: string): Promise<void> {
+    const response = await this.fetcher(path, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (response.ok) return
+    const value = await this.readJson(response)
+    this.throwResponseError(response.status, value)
+  }
+
+  private async readJson(response: Response): Promise<unknown> {
+    if (response.status === 204) return undefined
+    try {
+      return await response.json()
+    } catch {
+      return undefined
+    }
+  }
+
+  private throwResponseError(status: number, value: unknown): never {
+    const parsed = parseError(value)
+    throw new ApiClientError(
+      status,
+      parsed?.error.code ?? ApiErrorCode.INTERNAL_ERROR,
+      parsed?.error.message ?? 'Request failed. Please try again.',
+      parsed?.error.fields,
+    )
   }
 }
 
