@@ -2,6 +2,7 @@ import { ApiErrorCode } from '@remote/shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { AuditEvent } from '../database/audit-repository.js'
+import { ApplicationError } from '../domain/application-error.js'
 import { DeleteServerService } from './delete-server-service.js'
 
 const context = { actor: 'admin', sourceIp: '198.51.100.5' }
@@ -143,6 +144,45 @@ describe('DeleteServerService', () => {
     })
     expect(JSON.stringify(event)).not.toContain('SQLITE secret detail')
   })
+
+  it.each(['session manager', 'repository'] as const)(
+    'normalizes an ApplicationError thrown by the %s boundary',
+    (dependency) => {
+      const deps = dependencies()
+      const boundaryError = new ApplicationError(
+        ApiErrorCode.FORBIDDEN,
+        403,
+        'dependency secret detail',
+      )
+      if (dependency === 'session manager') {
+        deps.sessionManager.isServerActive.mockImplementation(() => {
+          throw boundaryError
+        })
+      } else {
+        deps.serverRepository.deleteWithAudit.mockImplementation(() => {
+          throw boundaryError
+        })
+      }
+      const subject = service(deps).service
+
+      expect(() => {
+        subject.execute('server-1', context)
+      }).toThrow(
+        expect.objectContaining({
+          code: ApiErrorCode.INTERNAL_ERROR,
+          statusCode: 500,
+          message: 'Internal server error',
+        }),
+      )
+
+      const event = deps.auditRepository.recordFailure.mock.calls[0]?.[0]
+      expect(event?.metadata).toEqual({
+        resource: 'server',
+        errorCode: ApiErrorCode.INTERNAL_ERROR,
+      })
+      expect(JSON.stringify(event)).not.toContain('dependency secret detail')
+    },
+  )
 
   it('preserves the primary stable error when failure auditing also fails', () => {
     const deps = dependencies()

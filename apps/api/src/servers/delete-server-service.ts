@@ -20,8 +20,10 @@ export interface DeleteServerServiceDependencies {
   now?: () => Date
 }
 
+class DeleteServerApplicationError extends ApplicationError {}
+
 function toApplicationError(error: unknown): ApplicationError {
-  return error instanceof ApplicationError
+  return error instanceof DeleteServerApplicationError
     ? error
     : new ApplicationError(
         ApiErrorCode.INTERNAL_ERROR,
@@ -45,7 +47,7 @@ export class DeleteServerService {
 
     try {
       if (this.dependencies.sessionManager.isServerActive(serverId)) {
-        throw new ApplicationError(
+        throw new DeleteServerApplicationError(
           ApiErrorCode.SERVER_HAS_ACTIVE_SESSION,
           409,
           'Disconnect the active terminal before deleting this server',
@@ -67,7 +69,7 @@ export class DeleteServerService {
         },
       )
       if (!deleted) {
-        throw new ApplicationError(
+        throw new DeleteServerApplicationError(
           ApiErrorCode.SERVER_NOT_FOUND,
           404,
           'Server not found',
