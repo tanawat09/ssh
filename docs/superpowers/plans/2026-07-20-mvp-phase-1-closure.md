@@ -345,7 +345,7 @@ git add README.md
 git commit -m "docs: document mvp phase one"
 ```
 
-### Task 3: Integrate, Record Release Evidence, Deploy, and Tag
+### Task 3: Integrate, Record Release Evidence, and Deploy
 
 **Files:**
 
@@ -355,9 +355,8 @@ git commit -m "docs: document mvp phase one"
 
 - Consumes: reviewed branch `docs/mvp-phase1-closure`, ignored main-checkout
   `.env`, `SMOKE_ADMIN_PASSWORD`, Compose services, Git remote `origin`.
-- Produces: a clean, verified `main`, healthy production Compose services,
-  sanitized release evidence, pushed `origin/main`, and immutable annotated tag
-  `v0.1.0` pointing to the same commit.
+- Produces: a clean, verified local `main`, healthy production Compose services,
+  and committed sanitized release evidence. It does not push or tag.
 
 - [ ] **Step 1: Confirm the branch and tag preconditions**
 
@@ -373,7 +372,7 @@ git ls-remote --tags origin refs/tags/v0.1.0
 Expected: clean `docs/mvp-phase1-closure`, no whitespace errors, and no local or
 remote `v0.1.0` output. If the tag exists, stop; never move or replace it.
 
-- [ ] **Step 2: Obtain final independent review**
+- [ ] **Step 2: Obtain candidate-branch independent review**
 
 Review `main...HEAD` against
 `docs/superpowers/specs/2026-07-20-mvp-phase-1-closure-design.md`. The review
@@ -682,7 +681,55 @@ git status --short --branch
 Expected: every gate passes on the exact final commit, both services remain
 healthy, health returns `healthy`, and main is clean.
 
-- [ ] **Step 9: Push main and publish the immutable annotated tag**
+### Task 4: Review and Publish the Immutable Release
+
+**Files:**
+
+- No repository file changes are expected.
+
+**Interfaces:**
+
+- Consumes: local `main` with committed `docs/releases/v0.1.0-checklist.md`,
+  completed Task 3 verification evidence, healthy production Compose services,
+  and Git remote `origin`.
+- Produces: reviewed and pushed `origin/main`, annotated tag `v0.1.0` resolving
+  to the same commit, and cleanup of only the owned release worktree/branch.
+
+- [ ] **Step 1: Review the complete final commit before publication**
+
+Review `b164925...main` against
+`docs/superpowers/specs/2026-07-20-mvp-phase-1-closure-design.md`, including the
+release checklist added after merge. The reviewer must inspect the complete diff
+and the Task 3 report and explicitly confirm:
+
+- Package and lockfile versions are exactly `0.1.0` with no dependency churn.
+- README claims match the implemented REST, WebSocket, security, Docker, and
+  test behavior.
+- Every checklist `Pass` row has corresponding sanitized command evidence.
+- No secret, user database, runtime contract, migration, application source,
+  generated artifact, or unrelated work changed.
+- Final format, lint, strict typecheck, Vitest, build, Playwright, Compose health,
+  login/create/delete smoke, cleanup, and Git cleanliness gates passed.
+
+Expected verdicts: `SPEC COMPLIANCE: PASS`, `CODE QUALITY: PASS`, and
+`READY TO PUBLISH`. Any Critical or Important finding blocks publication; fix
+and re-review before continuing.
+
+- [ ] **Step 2: Reconfirm tag and repository preconditions**
+
+Run:
+
+```bash
+git status --short --branch
+git diff --check
+git tag --list v0.1.0
+git ls-remote --tags origin refs/tags/v0.1.0
+```
+
+Expected: clean local main, no whitespace errors, and no local or remote tag
+output. If the tag exists, stop and do not move, delete, or replace it.
+
+- [ ] **Step 3: Push main and publish the immutable annotated tag**
 
 Run:
 
@@ -709,7 +756,7 @@ curl -fsS "http://localhost:${WEB_PORT:-8080}/health"
 Expected: `main`, `origin/main`, and `v0.1.0` resolve to one commit; main is
 clean; production API and web remain healthy.
 
-- [ ] **Step 10: Clean the owned release worktree after successful publication**
+- [ ] **Step 4: Clean the owned release worktree after successful publication**
 
 From `/Users/tanawatnoipalee/App_Max/Remote`, remove only the worktree created
 for this release and delete only its merged branch:
