@@ -1,5 +1,5 @@
 import { ApiErrorCode } from '@remote/shared'
-import type { RawData, WebSocket } from 'ws'
+import { WebSocket, type RawData } from 'ws'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildApp } from './app.js'
@@ -8,7 +8,6 @@ import type { AuditEvent } from './database/audit-repository.js'
 import type { ServerConnectionMaterial } from './database/server-repository.js'
 import type { ServerCredential } from './security/credential-cipher.js'
 import { DeleteServerService } from './servers/delete-server-service.js'
-import type { SshTerminal } from './terminal/ssh-terminal-gateway.js'
 import { TerminalSessionManager } from './terminal/terminal-session-manager.js'
 
 const config: AppConfig = {
@@ -103,22 +102,12 @@ describe('application health', () => {
     socket.terminate()
   })
 
-  it('shares terminal reservations with deletion without disconnecting the terminal', async () => {
+  it('blocks deletion as soon as a terminal WebSocket is accepted', async () => {
     const sessionManager = new TerminalSessionManager()
     const deleteWithAudit = vi.fn<(id: string, event: AuditEvent) => boolean>(
       () => true,
     )
     const recordFailure = vi.fn<(event: AuditEvent) => void>()
-    const closeTerminal = vi.fn<() => void>()
-    const terminal: SshTerminal = {
-      write: vi.fn(),
-      resize: vi.fn(),
-      pause: vi.fn(),
-      resume: vi.fn(),
-      close: closeTerminal,
-      onData: vi.fn(),
-      onClose: vi.fn(),
-    }
     const connectionMaterial: ServerConnectionMaterial = {
       id: 'server-1',
       host: 'server.example.com',
@@ -151,7 +140,9 @@ describe('application health', () => {
           getConnectionMaterialById: vi.fn(() => connectionMaterial),
         },
         credentialCipher: { decrypt: vi.fn(() => credential) },
-        sshGateway: { openTerminal: vi.fn(() => Promise.resolve(terminal)) },
+        sshGateway: {
+          openTerminal: vi.fn(() => new Promise<never>(() => undefined)),
+        },
         sessionManager,
         auditRepository: {
           recordSuccess: vi.fn(),
@@ -172,9 +163,6 @@ describe('application health', () => {
       },
     )
     sockets.add(socket)
-    await new Promise<RawData>((resolve) => {
-      socket.once('message', resolve)
-    })
 
     const response = await application.inject({
       method: 'DELETE',
@@ -193,7 +181,7 @@ describe('application health', () => {
       },
     })
     expect(deleteWithAudit).not.toHaveBeenCalled()
-    expect(closeTerminal).not.toHaveBeenCalled()
+    expect(socket.readyState).toBe(WebSocket.OPEN)
     expect(sessionManager.isServerActive('server-1')).toBe(true)
   })
 })

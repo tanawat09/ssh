@@ -116,6 +116,7 @@ export function registerTerminalRoute(
       let finished = false
       let drainStartedAt: number | undefined
       let drainTimer: NodeJS.Timeout | undefined
+      const isFinished = (): boolean => finished
 
       const sendControl = (message: TerminalServerMessage): void => {
         if (socket.readyState === WebSocket.OPEN) {
@@ -189,11 +190,21 @@ export function registerTerminalRoute(
         cleanup('error', false)
       }
 
+      try {
+        reservation = dependencies.sessionManager.reserve(actor, serverId)
+      } catch (error: unknown) {
+        fail(error)
+        return
+      }
+
       const setupPromise = new Promise<SshTerminal | undefined>((resolve) => {
         setImmediate(() => {
+          if (isFinished()) {
+            resolve(undefined)
+            return
+          }
           void (async () => {
             try {
-              reservation = dependencies.sessionManager.reserve(actor, serverId)
               const material =
                 dependencies.serverRepository.getConnectionMaterialById(
                   serverId,
@@ -215,7 +226,7 @@ export function registerTerminalRoute(
                   timeoutMs: dependencies.sshConnectTimeoutMs,
                 },
               )
-              if (finished) {
+              if (isFinished()) {
                 openedTerminal.close()
                 resolve(undefined)
                 return

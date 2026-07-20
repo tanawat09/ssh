@@ -107,6 +107,7 @@ async function setup(overrides: SetupOverrides = {}) {
   )
   const recordSuccess = vi.fn()
   const recordFailure = vi.fn()
+  const sessionManager = new TerminalSessionManager()
 
   registerTerminalRoute(app, {
     allowedOrigin: origin,
@@ -114,7 +115,7 @@ async function setup(overrides: SetupOverrides = {}) {
     serverRepository: { getConnectionMaterialById },
     credentialCipher: { decrypt },
     sshGateway: { openTerminal },
-    sessionManager: new TerminalSessionManager(),
+    sessionManager,
     auditRepository: { recordSuccess, recordFailure },
     generateId: () => 'audit-id',
     now: () => new Date('2026-07-17T00:00:00.000Z'),
@@ -131,6 +132,7 @@ async function setup(overrides: SetupOverrides = {}) {
     getConnectionMaterialById,
     recordSuccess,
     recordFailure,
+    sessionManager,
     headers: { origin, cookie: `remote_session=${token}` },
   }
 }
@@ -219,6 +221,54 @@ describe('terminal websocket route', () => {
         targetId: 'server-1',
       }),
     )
+  })
+
+  it('does not reserve after the socket closes before deferred setup', async () => {
+    const context = await setup()
+    const socket = await context.app.injectWS(
+      '/api/v1/servers/server-1/terminal',
+      { headers: context.headers },
+    )
+    sockets.push(socket)
+    const closed = new Promise<void>((resolve) => {
+      socket.once('close', () => {
+        resolve()
+      })
+    })
+
+    socket.terminate()
+    await closed
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+
+    expect(context.sessionManager.isServerActive('server-1')).toBe(false)
+    expect(context.getConnectionMaterialById).not.toHaveBeenCalled()
+    expect(context.openTerminal).not.toHaveBeenCalled()
+  })
+
+  it('does not reserve after protocol-error cleanup before deferred setup', async () => {
+    const context = await setup()
+    const socket = await context.app.injectWS(
+      '/api/v1/servers/server-1/terminal',
+      { headers: context.headers },
+    )
+    sockets.push(socket)
+    const errorMessage = nextMessage(socket)
+
+    socket.send('{invalid')
+    expect(parseRawJson((await errorMessage).data)).toEqual({
+      type: 'error',
+      code: 'TERMINAL_PROTOCOL_ERROR',
+      message: 'Invalid terminal message',
+    })
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+
+    expect(context.sessionManager.isServerActive('server-1')).toBe(false)
+    expect(context.getConnectionMaterialById).not.toHaveBeenCalled()
+    expect(context.openTerminal).not.toHaveBeenCalled()
   })
 
   it('disconnects explicitly and records sanitized duration metadata', async () => {
