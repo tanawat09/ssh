@@ -182,6 +182,7 @@ describe('public response schemas', () => {
         'FORBIDDEN',
         'SERVER_ALREADY_EXISTS',
         'SERVER_NOT_FOUND',
+        'SERVER_HAS_ACTIVE_SESSION',
         'TERMINAL_ALREADY_ACTIVE',
         'TERMINAL_SESSION_LIMIT',
         'TERMINAL_PROTOCOL_ERROR',
