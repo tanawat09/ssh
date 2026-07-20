@@ -47,6 +47,8 @@ blocking defect is found:
   decision.
 - Root and workspace package metadata set to `0.1.0`, with the lockfile updated
   mechanically so the repository metadata matches the Git tag.
+- The API workspace's internal `@remote/shared` dependency range aligned from
+  `^1.0.0` to `^0.1.0`. External dependency names and versions remain unchanged.
 - An annotated Git tag named `v0.1.0` on the exact verified `main` commit.
 
 No secret, cookie, password, private key, passphrase, encryption key, JWT,
@@ -180,8 +182,9 @@ automatic deployment pipeline is added in this closure.
 
 ## Backward Compatibility
 
-The closure changes documentation and package version metadata only. It does
-not alter REST or WebSocket contracts, database schema, encrypted records,
+The closure changes documentation and package version metadata, including the
+matching internal workspace dependency range, only. It does not alter external
+dependencies, REST or WebSocket contracts, database schema, encrypted records,
 environment variable names, published Compose ports, authentication, permission
 behavior, or existing runtime defaults. Docker volumes and saved SQLite data are
 preserved during rebuild and smoke verification.

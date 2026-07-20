@@ -23,6 +23,8 @@ Playwright 1.61.1, Docker Compose, Git
 
 - Do not add or change runtime application behavior unless a release gate proves
   a defect and the user separately approves its TDD fix.
+- Align the API workspace's internal `@remote/shared` dependency range to
+  `^0.1.0`; do not change any external dependency name or version.
 - Keep REST routes under `/api/v1`; `v0.1.0` is release metadata, not an API
   version change.
 - Do not create SFTP, RDP, VNC, MFA, team, port-forwarding, jump-host,
@@ -66,8 +68,9 @@ Playwright 1.61.1, Docker Compose, Git
 **Interfaces:**
 
 - Consumes: the existing private npm workspace graph and package lock.
-- Produces: root and workspace package versions equal to `0.1.0`, with no Git
-  tag and no dependency change.
+- Produces: root and workspace package versions equal to `0.1.0`, the API's
+  internal `@remote/shared` range equal to `^0.1.0`, no Git tag, and no external
+  dependency change.
 
 - [ ] **Step 1: Prove the metadata is not yet release-aligned**
 
@@ -96,8 +99,10 @@ docker run --rm \
   npm version 0.1.0 --workspaces --include-workspace-root --no-git-tag-version
 ```
 
-Expected: only the five declared metadata files change. Dependency versions,
-integrity values, scripts, and workspace relationships remain unchanged.
+Expected: only the five declared metadata files change. The API's internal
+`@remote/shared` range changes from `^1.0.0` to `^0.1.0`; external dependency
+versions, integrity values, scripts, and other workspace relationships remain
+unchanged.
 
 - [ ] **Step 3: Verify every repository-owned version entry**
 
@@ -120,12 +125,19 @@ docker run --rm \
       const value = JSON.parse(readFileSync(file, "utf8"));
       if (value.version !== "0.1.0") throw new Error(`${file}: ${value.version}`);
     }
+    const api = JSON.parse(readFileSync("apps/api/package.json", "utf8"));
+    if (api.dependencies?.["@remote/shared"] !== "^0.1.0") {
+      throw new Error("apps/api internal @remote/shared range mismatch");
+    }
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
     const expected = ["", "apps/api", "apps/web", "packages/shared"];
     for (const key of expected) {
       if (lock.packages[key]?.version !== "0.1.0") {
         throw new Error(`package-lock packages[${key}].version mismatch`);
       }
+    }
+    if (lock.packages["apps/api"]?.dependencies?.["@remote/shared"] !== "^0.1.0") {
+      throw new Error("package-lock API @remote/shared range mismatch");
     }
     console.log("release versions=0.1.0");
   '
@@ -143,7 +155,8 @@ git diff --check
 ```
 
 Expected: lockfile changes are limited to the root and three workspace package
-version fields; no whitespace errors.
+version fields plus the API's internal `@remote/shared` range; no external
+dependency, resolved URL, integrity, or whitespace changes.
 
 - [ ] **Step 5: Run focused metadata quality checks**
 
@@ -379,7 +392,8 @@ Review `main...HEAD` against
 must explicitly confirm:
 
 - Only approved documentation and release metadata changed.
-- All root/workspace owned versions equal `0.1.0` and the lockfile has no
+- All root/workspace owned versions equal `0.1.0`, the API's internal
+  `@remote/shared` range equals `^0.1.0`, and the lockfile has no external
   dependency churn.
 - README capability, security, exclusion, command, health, and limitation claims
   match actual code and Compose behavior.
@@ -702,7 +716,8 @@ Review `b164925...main` against
 release checklist added after merge. The reviewer must inspect the complete diff
 and the Task 3 report and explicitly confirm:
 
-- Package and lockfile versions are exactly `0.1.0` with no dependency churn.
+- Package and lockfile versions are exactly `0.1.0`, the API's internal
+  `@remote/shared` range is `^0.1.0`, and there is no external dependency churn.
 - README claims match the implemented REST, WebSocket, security, Docker, and
   test behavior.
 - Every checklist `Pass` row has corresponding sanitized command evidence.
