@@ -32,6 +32,12 @@ export interface BuildAppOptions {
 }
 
 const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+const invalidRequestBody = JSON.stringify({
+  error: {
+    code: ApiErrorCode.INVALID_REQUEST,
+    message: 'Invalid request',
+  },
+})
 const maxRateLimitKeys = 5_000
 const trustedProxyCidrs = [
   '127.0.0.0/8',
@@ -138,7 +144,16 @@ export function buildApp({
   terminalRouteDependencies,
 }: BuildAppOptions): FastifyInstance {
   const app = Fastify({
-    routerOptions: { maxParamLength: 256 },
+    routerOptions: {
+      maxParamLength: 256,
+      onMaxParamLength: (_path, _request, response) => {
+        response.writeHead(400, {
+          'content-length': Buffer.byteLength(invalidRequestBody),
+          'content-type': 'application/json; charset=utf-8',
+        })
+        response.end(invalidRequestBody)
+      },
+    },
     trustProxy: config.nodeEnv === 'production' ? trustedProxyCidrs : false,
     logger:
       config.nodeEnv === 'production'

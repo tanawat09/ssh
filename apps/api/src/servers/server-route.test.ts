@@ -353,6 +353,21 @@ describe('DELETE /api/v1/servers/:serverId', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
+  it('returns a stable 400 when the server ID exceeds the router limit', async () => {
+    const { app, execute, token } = await setupDelete()
+    const serverId = 's'.repeat(257)
+
+    const response = await app.inject(deleteRequest(token, serverId))
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toEqual({
+      error: { code: ApiErrorCode.INVALID_REQUEST, message: 'Invalid request' },
+    })
+    expect(response.body).not.toContain(serverId)
+    expect(response.body).not.toContain('/api/v1/servers/')
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it.each([
     [ApiErrorCode.SERVER_NOT_FOUND, 404, 'Server not found'],
     [
