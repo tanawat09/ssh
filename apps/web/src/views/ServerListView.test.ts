@@ -1,7 +1,7 @@
 import { ApiErrorCode, type ServerDto } from '@remote/shared'
 import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClientError } from '../lib/api-client'
 import ServerListView from './ServerListView.vue'
@@ -27,6 +27,7 @@ function mountView(
   deleteServer: (serverId: string) => Promise<void> = vi
     .fn<(serverId: string) => Promise<void>>()
     .mockResolvedValue(undefined),
+  attachTo?: Element,
 ) {
   return mount(ServerListView, {
     global: {
@@ -36,6 +37,7 @@ function mountView(
       },
     },
     props: { listServers, deleteServer },
+    ...(attachTo === undefined ? {} : { attachTo }),
   })
 }
 
@@ -54,6 +56,10 @@ function deferred<T>(): {
 }
 
 describe('ServerListView', () => {
+  afterEach(() => {
+    document.body.replaceChildren()
+  })
+
   it('shows loading state while the list request is pending', async () => {
     let resolve: ((value: ServerDto[]) => void) | undefined
     const listServers = vi.fn(
@@ -111,17 +117,75 @@ describe('ServerListView', () => {
     expect(dialogs[0]?.text()).toContain('deploy@server.example.com:22')
   })
 
-  it('closes the confirmation dialog without deleting when cancelled', async () => {
-    const deleteServer = vi.fn<(serverId: string) => Promise<void>>()
-    const wrapper = mountView(vi.fn().mockResolvedValue([server]), deleteServer)
+  it('moves focus into the dialog and makes background controls inert', async () => {
+    const wrapper = mountView(
+      vi.fn().mockResolvedValue([server]),
+      undefined,
+      document.body,
+    )
     await flushPromises()
 
     await wrapper.get('[aria-label="Delete Production"]').trigger('click')
+    await flushPromises()
+
+    expect(document.activeElement).toBe(
+      wrapper.get('.confirmation-dialog .secondary-button').element,
+    )
+    expect(wrapper.get('.app-header').attributes()).toHaveProperty('inert')
+    expect(wrapper.get('.server-list').attributes()).toHaveProperty('inert')
+  })
+
+  it('contains tab focus and restores the exact opener after Escape', async () => {
+    const wrapper = mountView(
+      vi.fn().mockResolvedValue([server]),
+      undefined,
+      document.body,
+    )
+    await flushPromises()
+
+    const opener = wrapper.get<HTMLButtonElement>(
+      '[aria-label="Delete Production"]',
+    )
+    await opener.trigger('click')
+    await flushPromises()
+    const dialog = wrapper.get<HTMLElement>('.confirmation-dialog')
+    const closeButton = wrapper.get<HTMLButtonElement>('.dialog-close')
+    const confirmButton = wrapper.get<HTMLButtonElement>('.danger-button')
+
+    closeButton.element.focus()
+    await dialog.trigger('keydown', { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(confirmButton.element)
+
+    confirmButton.element.focus()
+    await dialog.trigger('keydown', { key: 'Tab' })
+    expect(document.activeElement).toBe(closeButton.element)
+
+    await dialog.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(opener.element)
+  })
+
+  it('closes the confirmation dialog without deleting when cancelled', async () => {
+    const deleteServer = vi.fn<(serverId: string) => Promise<void>>()
+    const wrapper = mountView(
+      vi.fn().mockResolvedValue([server]),
+      deleteServer,
+      document.body,
+    )
+    await flushPromises()
+
+    const opener = wrapper.get<HTMLButtonElement>(
+      '[aria-label="Delete Production"]',
+    )
+    await opener.trigger('click')
     await wrapper.get('.confirmation-dialog .secondary-button').trigger('click')
+    await flushPromises()
 
     expect(deleteServer).not.toHaveBeenCalled()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Production')
+    expect(document.activeElement).toBe(opener.element)
   })
 
   it('disables dialog actions and prevents repeat deletion while pending', async () => {
@@ -129,7 +193,12 @@ describe('ServerListView', () => {
     const deleteServer = vi
       .fn<(serverId: string) => Promise<void>>()
       .mockReturnValue(deletion.promise)
-    const wrapper = mountView(vi.fn().mockResolvedValue([server]), deleteServer)
+    const staging = { ...server, id: 'server-2', name: 'Staging' }
+    const wrapper = mountView(
+      vi.fn().mockResolvedValue([server, staging]),
+      deleteServer,
+      document.body,
+    )
     await flushPromises()
 
     await wrapper.get('[aria-label="Delete Production"]').trigger('click')
@@ -143,11 +212,20 @@ describe('ServerListView', () => {
       wrapper.get('.confirmation-dialog .secondary-button').attributes(),
     ).toHaveProperty('disabled')
     expect(wrapper.get('.dialog-close').attributes()).toHaveProperty('disabled')
+    const dialog = wrapper.get<HTMLElement>('.confirmation-dialog')
+    expect(document.activeElement).toBe(dialog.element)
+    await dialog.trigger('keydown', { key: 'Escape' })
+    await dialog.trigger('keydown', { key: 'Tab' })
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(document.activeElement).toBe(dialog.element)
     await wrapper.get('.danger-button').trigger('click')
     expect(deleteServer).toHaveBeenCalledTimes(1)
 
     deletion.resolve(undefined)
     await flushPromises()
+    expect(document.activeElement).toBe(
+      wrapper.get('[aria-label="Delete Staging"]').element,
+    )
   })
 
   it('removes only the deleted server after a successful response', async () => {
@@ -186,18 +264,30 @@ describe('ServerListView', () => {
           'Server has an active terminal session',
         ),
       )
-    const wrapper = mountView(vi.fn().mockResolvedValue([server]), deleteServer)
+    const wrapper = mountView(
+      vi.fn().mockResolvedValue([server]),
+      deleteServer,
+      document.body,
+    )
     await flushPromises()
 
-    await wrapper.get('[aria-label="Delete Production"]').trigger('click')
+    const opener = wrapper.get<HTMLButtonElement>(
+      '[aria-label="Delete Production"]',
+    )
+    await opener.trigger('click')
     await wrapper.get('.danger-button').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain(
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.text()).toContain(
       'Disconnect the active terminal before deleting this server.',
     )
     expect(wrapper.get('.server-row').text()).toContain('Production')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+    await wrapper.get('.confirmation-dialog .secondary-button').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(opener.element)
   })
 
   it('redirects after an unauthenticated delete without removing the server', async () => {

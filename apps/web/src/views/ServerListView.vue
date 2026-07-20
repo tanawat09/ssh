@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ApiErrorCode, type ServerDto } from '@remote/shared'
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { SquareTerminal, Trash2, X } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
@@ -19,6 +19,11 @@ const errorMessage = ref('')
 const selectedServer = ref<ServerDto | null>(null)
 const deletePending = ref(false)
 const deleteError = ref('')
+const appShell = ref<HTMLElement | null>(null)
+const deleteDialog = ref<HTMLElement | null>(null)
+const dialogCancelButton = ref<HTMLButtonElement | null>(null)
+let deleteOpener: HTMLButtonElement | null = null
+let deleteOpenerIndex = 0
 
 async function loadServers(): Promise<void> {
   if (pending.value && servers.value.length > 0) return
@@ -38,16 +43,101 @@ async function loadServers(): Promise<void> {
   }
 }
 
-function openDeleteDialog(server: ServerDto): void {
+async function openDeleteDialog(
+  server: ServerDto,
+  event: MouseEvent,
+): Promise<void> {
   if (deletePending.value) return
+  if (!(event.currentTarget instanceof HTMLButtonElement)) return
+
+  const deleteButtons =
+    appShell.value?.querySelectorAll<HTMLButtonElement>(
+      '.server-delete-button',
+    ) ?? []
+  deleteOpener = event.currentTarget
+  deleteOpenerIndex = Math.max(
+    0,
+    Array.from(deleteButtons).indexOf(deleteOpener),
+  )
   selectedServer.value = server
   deleteError.value = ''
+  await nextTick()
+  dialogCancelButton.value?.focus()
 }
 
-function closeDeleteDialog(): void {
+async function restoreFocusAfterDialog(): Promise<void> {
+  const opener = deleteOpener
+  deleteOpener = null
+  await nextTick()
+
+  const shell = appShell.value
+  if (shell === null) return
+  if (opener !== null && shell.contains(opener) && !opener.disabled) {
+    opener.focus()
+    return
+  }
+
+  const remainingDeleteButtons = shell.querySelectorAll<HTMLButtonElement>(
+    '.server-delete-button:not(:disabled)',
+  )
+  const fallbackIndex = Math.min(
+    deleteOpenerIndex,
+    remainingDeleteButtons.length - 1,
+  )
+  const fallback =
+    remainingDeleteButtons.item(fallbackIndex) ??
+    shell.querySelector<HTMLElement>('.header-button')
+  fallback?.focus()
+}
+
+async function closeDeleteDialog(): Promise<void> {
   if (deletePending.value) return
   selectedServer.value = null
   deleteError.value = ''
+  await restoreFocusAfterDialog()
+}
+
+function handleDialogKeydown(event: KeyboardEvent): void {
+  const dialog = deleteDialog.value
+  if (dialog === null) return
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    if (deletePending.value) dialog.focus()
+    else void closeDeleteDialog()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  if (deletePending.value) {
+    event.preventDefault()
+    dialog.focus()
+    return
+  }
+
+  const focusableElements = Array.from(
+    dialog.querySelectorAll<HTMLElement>('button:not(:disabled)'),
+  )
+  const firstElement = focusableElements.at(0)
+  const lastElement = focusableElements.at(-1)
+  if (firstElement === undefined || lastElement === undefined) {
+    event.preventDefault()
+    dialog.focus()
+  } else if (
+    event.shiftKey &&
+    (document.activeElement === firstElement ||
+      document.activeElement === dialog)
+  ) {
+    event.preventDefault()
+    lastElement.focus()
+  } else if (
+    !event.shiftKey &&
+    (document.activeElement === lastElement ||
+      document.activeElement === dialog)
+  ) {
+    event.preventDefault()
+    firstElement.focus()
+  }
 }
 
 async function confirmDelete(): Promise<void> {
@@ -56,11 +146,15 @@ async function confirmDelete(): Promise<void> {
 
   deletePending.value = true
   deleteError.value = ''
+  await nextTick()
+  deleteDialog.value?.focus()
   try {
     const operation = props.deleteServer ?? ((id) => apiClient.deleteServer(id))
     await session.runAuthenticated(() => operation(server.id))
     servers.value = servers.value.filter(({ id }) => id !== server.id)
     selectedServer.value = null
+    deletePending.value = false
+    await restoreFocusAfterDialog()
   } catch (error) {
     if (
       error instanceof ApiClientError &&
@@ -84,8 +178,8 @@ onMounted(loadServers)
 </script>
 
 <template>
-  <main class="app-shell">
-    <header class="app-header">
+  <main ref="appShell" class="app-shell">
+    <header class="app-header" :inert="selectedServer !== null">
       <div>
         <p class="eyebrow">Remote Admin</p>
         <h1>Servers</h1>
@@ -99,7 +193,12 @@ onMounted(loadServers)
         </RouterLink>
       </div>
     </header>
-    <section class="server-list" aria-live="polite" aria-atomic="true">
+    <section
+      class="server-list"
+      aria-live="polite"
+      aria-atomic="true"
+      :inert="selectedServer !== null"
+    >
       <p v-if="pending" class="status-message">Loading servers...</p>
       <div v-else-if="errorMessage" class="list-error">
         <p class="form-error">{{ errorMessage }}</p>
@@ -132,7 +231,7 @@ onMounted(loadServers)
                 :title="`Delete ${server.name}`"
                 :aria-label="`Delete ${server.name}`"
                 :disabled="deletePending"
-                @click="openDeleteDialog(server)"
+                @click="openDeleteDialog(server, $event)"
               >
                 <Trash2 :size="18" aria-hidden="true" />
               </button>
@@ -163,13 +262,15 @@ onMounted(loadServers)
       v-if="selectedServer"
       class="dialog-backdrop"
       @click.self="closeDeleteDialog"
-      @keydown.esc="closeDeleteDialog"
     >
       <section
+        ref="deleteDialog"
         class="confirmation-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-server-title"
+        tabindex="-1"
+        @keydown="handleDialogKeydown"
       >
         <button
           class="icon-button dialog-close"
@@ -187,9 +288,12 @@ onMounted(loadServers)
             selectedServer.port
           }}
         </p>
-        <p v-if="deleteError" class="form-error">{{ deleteError }}</p>
+        <p v-if="deleteError" class="form-error" role="alert">
+          {{ deleteError }}
+        </p>
         <div class="dialog-actions">
           <button
+            ref="dialogCancelButton"
             class="secondary-button"
             type="button"
             :disabled="deletePending"

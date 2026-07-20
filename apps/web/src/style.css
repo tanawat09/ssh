@@ -303,6 +303,10 @@ textarea[aria-invalid='true'] {
   background: #fff;
   box-shadow: 0 18px 48px rgb(0 0 0 / 24%);
 }
+.confirmation-dialog:focus-visible {
+  outline: 3px solid #25634a;
+  outline-offset: 2px;
+}
 .confirmation-dialog h2 {
   margin: 0 44px 8px 0;
   overflow-wrap: anywhere;
