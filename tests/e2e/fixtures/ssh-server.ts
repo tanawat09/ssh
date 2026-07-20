@@ -18,6 +18,7 @@ const adminPassword = 'e2e-admin-password'
 const sshUsername = 'e2e-ssh-user'
 const mobileSshUsername = 'e2e-mobile-user'
 const terminalUsernames = new Set([
+  'e2e-delete-server',
   'e2e-terminal-one',
   'e2e-terminal-two',
   'e2e-terminal-mobile',
