@@ -16,6 +16,13 @@ const maximumSessionsPerActor = 5
 export class TerminalSessionManager {
   readonly #sessionsByActor = new Map<string, Map<string, string>>()
 
+  isServerActive(serverId: string): boolean {
+    for (const sessions of this.#sessionsByActor.values()) {
+      if (sessions.has(serverId)) return true
+    }
+    return false
+  }
+
   reserve(actor: string, serverId: string): TerminalReservation {
     const sessions =
       this.#sessionsByActor.get(actor) ?? new Map<string, string>()

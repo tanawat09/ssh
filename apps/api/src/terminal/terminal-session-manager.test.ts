@@ -56,6 +56,26 @@ describe('TerminalSessionManager', () => {
     expect(() => manager.reserve('other-admin', 'server-1')).not.toThrow()
   })
 
+  it('reports a server active across actors until its reservation is released', () => {
+    const manager = new TerminalSessionManager()
+    const reservation = manager.reserve('operator-a', 'server-1')
+
+    expect(manager.isServerActive('server-1')).toBe(true)
+    expect(manager.isServerActive('server-2')).toBe(false)
+
+    reservation.release()
+    expect(manager.isServerActive('server-1')).toBe(false)
+  })
+
+  it('keeps a server active while another actor still has a reservation', () => {
+    const manager = new TerminalSessionManager()
+    const first = manager.reserve('operator-a', 'server-1')
+    manager.reserve('operator-b', 'server-1')
+
+    first.release()
+    expect(manager.isServerActive('server-1')).toBe(true)
+  })
+
   it('allows reuse after an idempotent release', () => {
     const manager = new TerminalSessionManager()
     const reservation = manager.reserve('admin', 'server-1')

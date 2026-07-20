@@ -129,6 +129,30 @@ describe('requirePermission', () => {
     expect(response.statusCode).toBe(200)
   })
 
+  it('allows an admin JWT to use servers:delete', async () => {
+    const app = Fastify()
+    apps.push(app)
+    void app.register(cookie)
+    void app.register(jwt, {
+      secret: 'a-secure-test-jwt-secret-with-32-bytes',
+      cookie: { cookieName: 'remote_session', signed: false },
+      sign: { algorithm: 'HS256', expiresIn: 3600 },
+    })
+    app.delete(
+      '/protected-delete',
+      { preHandler: requirePermission('servers:delete') },
+      () => ({ ok: true }),
+    )
+    await app.ready()
+    const token = app.jwt.sign({ sub: 'admin', role: 'admin' })
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/protected-delete',
+      headers: { cookie: `remote_session=${token}` },
+    })
+    expect(response.statusCode).toBe(200)
+  })
+
   it('rejects a valid JWT whose role has no mapped permission', async () => {
     const app = createApp()
     await app.ready()
