@@ -1,6 +1,6 @@
 {
   "name": "@remote/shared",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Runtime-safe public contracts for the Web Remote Platform",
   "main": "dist/index.js",
   "scripts": {

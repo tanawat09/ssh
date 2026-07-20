@@ -1,6 +1,6 @@
 {
   "name": "web-remote-platform",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "",
   "scripts": {
     "build": "npm run build:shared && npm run build -w @remote/api && npm run build -w @remote/web",
